@@ -1,5 +1,10 @@
 # sigma-rust
 
+![Build](https://github.com/jopohl/sigma-rust/actions/workflows/ci.yml/badge.svg)
+[![Crates.io](https://img.shields.io/crates/v/sigma-rust)](https://crates.io/crates/sigma-rust)
+[![Docs.rs](https://docs.rs/sigma-rust/badge.svg)](https://docs.rs/sigma-rust)
+
+
 A library for parsing and evaluating Sigma rules written in Rust.
 
 ## Features
