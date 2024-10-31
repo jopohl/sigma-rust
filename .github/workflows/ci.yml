@@ -45,6 +45,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Get rules from SigmaHQ for testing
+        run: |
+          wget https://github.com/SigmaHQ/sigma/releases/download/r2024-09-02/sigma_all_rules.zip
+          unzip sigma_all_rules.zip -d sigma-main-rules
+
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
