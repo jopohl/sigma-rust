@@ -1,6 +1,7 @@
 # sigma-rust
 
 ![Build](https://github.com/jopohl/sigma-rust/actions/workflows/ci.yml/badge.svg)
+[![codecov](https://codecov.io/github/jopohl/sigma-rust/graph/badge.svg?token=6SOQK71524)](https://codecov.io/github/jopohl/sigma-rust)
 [![Crates.io](https://img.shields.io/crates/v/sigma-rust)](https://crates.io/crates/sigma-rust)
 [![Docs.rs](https://docs.rs/sigma-rust/badge.svg)](https://docs.rs/sigma-rust)
 
