@@ -1,5 +1,3 @@
-
-
 #[cfg(feature = "serde_json")]
 #[test]
 fn test_match_event_from_json() {
@@ -78,7 +76,6 @@ fn test_match_multiple_events_from_json() {
 
     let rule = rule_from_yaml(rule).unwrap();
     let events = events_from_json(events_json).unwrap();
-
 
     for event in events {
         assert!(check_rule(&rule, &event));
