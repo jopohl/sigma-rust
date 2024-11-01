@@ -6,7 +6,7 @@
 [![Docs.rs](https://docs.rs/sigma-rust/badge.svg)](https://docs.rs/sigma-rust)
 
 
-A library for parsing and evaluating Sigma rules written in Rust.
+A Rust library for parsing and evaluating Sigma rules to create custom detection pipelines.
 
 ## Features
 
