@@ -6,12 +6,9 @@ pub use modifier::*;
 pub use value::*;
 
 use crate::error::ParserError;
-use crate::error::ParserError::{
-    ConflictingModifiers, IPParsing, InvalidYAML, StandaloneViolation, Utf16WithoutBase64,
-};
+use crate::error::ParserError::{IPParsing, InvalidYAML};
 use crate::event::Event;
 use crate::field::transformation::{encode_base64, encode_base64_offset, windash_variations};
-use crate::field::StandaloneModifier::{Cidr, Re};
 use crate::field::ValueTransformer::{Base64, Base64offset, Windash};
 use cidr::IpCidr;
 use regex::Regex;
@@ -23,8 +20,21 @@ use std::str::FromStr;
 pub struct Field {
     pub name: String,
     pub values: Vec<FieldValue>,
-    pub match_all: bool,
     pub(crate) modifier: Modifier,
+}
+
+impl FromStr for Field {
+    type Err = ParserError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let result = Self {
+            name: s.split("|").next().unwrap_or("").to_string(),
+            values: vec![],
+            modifier: Modifier::from_str(s)?,
+        };
+
+        Ok(result)
+    }
 }
 
 impl Field {
@@ -32,7 +42,7 @@ impl Field {
         name_with_modifiers: S,
         values: Vec<FieldValue>,
     ) -> Result<Field, ParserError> {
-        match Self::parse(name_with_modifiers) {
+        match Self::from_str(name_with_modifiers.as_ref()) {
             Ok(mut field) => {
                 field.values = values;
                 match field.bootstrap() {
@@ -82,11 +92,7 @@ impl Field {
                     }
                 }
             }
-            _ => {}
-        }
-
-        match self.modifier.standalone_modifier {
-            Some(Cidr) => {
+            Some(MatchModifier::Cidr) => {
                 for i in 0..self.values.len() {
                     let val_str = self.values[i].value_to_string();
                     match IpCidr::from_str(val_str.as_str()) {
@@ -95,7 +101,7 @@ impl Field {
                     }
                 }
             }
-            Some(Re) => {
+            Some(MatchModifier::Re) => {
                 for i in 0..self.values.len() {
                     match Regex::new(self.values[i].value_to_string().as_str()) {
                         Ok(re) => self.values[i] = FieldValue::Regex(re),
@@ -103,135 +109,40 @@ impl Field {
                     }
                 }
             }
-            None => {}
+            _ => {}
         }
 
-        if self.modifier.value_transformer.is_some() {
-            let mut transformed_values = vec![];
-            for val in self.values.iter() {
-                match &self.modifier.value_transformer {
-                    Some(Base64(utf16)) => {
-                        transformed_values.push(FieldValue::String(encode_base64(val, utf16)))
-                    }
-                    Some(Base64offset(utf16)) => transformed_values.extend(
-                        encode_base64_offset(val, utf16)
-                            .into_iter()
-                            .map(FieldValue::String),
-                    ),
-                    Some(Windash) => transformed_values
-                        .extend(windash_variations(val).into_iter().map(FieldValue::String)),
-                    None => {}
-                }
+        match &self.modifier.value_transformer {
+            Some(Base64(utf16)) => {
+                self.values = self
+                    .values
+                    .iter()
+                    .map(|val| FieldValue::String(encode_base64(val, utf16)))
+                    .collect();
             }
-            self.values = transformed_values
+            Some(Base64offset(utf16)) => {
+                self.values = self
+                    .values
+                    .iter()
+                    .flat_map(|val| encode_base64_offset(val, utf16))
+                    .map(FieldValue::String)
+                    .collect();
+            }
+            Some(Windash) => {
+                self.values = self
+                    .values
+                    .iter()
+                    .flat_map(windash_variations)
+                    .map(FieldValue::String)
+                    .collect();
+            }
+            None => {}
         }
 
         Ok(())
     }
 
-    pub(crate) fn parse<S: AsRef<str>>(s: S) -> Result<Field, ParserError> {
-        let splitted = s.as_ref().split("|").collect::<Vec<&str>>();
-        let mut result = Self {
-            name: splitted[0].to_string(),
-            values: vec![],
-            match_all: false,
-            modifier: Modifier::default(),
-        };
-
-        let mut utf16_modifier: Option<Utf16Modifier> = None;
-        for s in splitted.iter().skip(1).map(|s| s.to_lowercase()) {
-            if s == "all" {
-                result.match_all = true;
-                continue;
-            }
-
-            if let Ok(match_type) = MatchModifier::from_str(&s) {
-                match result.modifier.match_modifier {
-                    Some(m) => {
-                        return Err(ConflictingModifiers(match_type.to_string(), m.to_string()))
-                    }
-                    None => {
-                        result.modifier.match_modifier = Some(match_type);
-                        continue;
-                    }
-                }
-            }
-
-            match Utf16Modifier::from_str(&s) {
-                Ok(m) => match utf16_modifier {
-                    Some(m2) => return Err(ConflictingModifiers(m.to_string(), m2.to_string())),
-                    None => {
-                        utf16_modifier = Some(m);
-                        continue;
-                    }
-                },
-                Err(ParserError::UnknownModifier(_)) => {}
-                Err(err) => return Err(err),
-            }
-
-            if let Ok(value_transformer) = ValueTransformer::from_str(&s) {
-                match result.modifier.value_transformer {
-                    Some(v) => {
-                        return Err(ConflictingModifiers(
-                            value_transformer.to_string(),
-                            v.to_string(),
-                        ))
-                    }
-                    None => {
-                        result.modifier.value_transformer = Some(value_transformer);
-                        continue;
-                    }
-                }
-            }
-
-            if let Ok(standalone) = StandaloneModifier::from_str(&s) {
-                match result.modifier.standalone_modifier {
-                    Some(s) => {
-                        return Err(ConflictingModifiers(standalone.to_string(), s.to_string()))
-                    }
-                    None => {
-                        result.modifier.standalone_modifier = Some(standalone);
-                        continue;
-                    }
-                }
-            };
-
-            return Err(ParserError::UnknownModifier(s));
-        }
-
-        if utf16_modifier.is_some() {
-            match result.modifier.value_transformer {
-                Some(value_transformer) => match value_transformer {
-                    Base64(_) => result.modifier.value_transformer = Some(Base64(utf16_modifier)),
-                    Base64offset(_) => {
-                        result.modifier.value_transformer = Some(Base64offset(utf16_modifier))
-                    }
-                    _ => return Err(Utf16WithoutBase64),
-                },
-                None => {
-                    return Err(Utf16WithoutBase64);
-                }
-            }
-        }
-
-        if let Some(ref s) = result.modifier.standalone_modifier {
-            if result.modifier.match_modifier.is_some()
-                || result.modifier.value_transformer.is_some()
-            {
-                return Err(StandaloneViolation(s.to_string()));
-            }
-        };
-
-        Ok(result)
-    }
-
     pub(crate) fn compare(&self, target: &FieldValue, value: &FieldValue) -> bool {
-        match self.modifier.standalone_modifier {
-            Some(Re) => return value.is_regex_match(target.value_to_string().as_str()),
-            Some(Cidr) => return value.cidr_contains(target),
-            None => {}
-        }
-
         match self.modifier.match_modifier {
             Some(MatchModifier::Contains) => target.contains(value),
             Some(MatchModifier::StartsWith) => target.starts_with(value),
@@ -241,6 +152,9 @@ impl Field {
             Some(MatchModifier::Gte) => target >= value,
             Some(MatchModifier::Lt) => target < value,
             Some(MatchModifier::Lte) => target <= value,
+
+            Some(MatchModifier::Re) => value.is_regex_match(target.value_to_string().as_str()),
+            Some(MatchModifier::Cidr) => value.cidr_contains(target),
 
             // implicit equals
             None => value == target,
@@ -259,16 +173,16 @@ impl Field {
 
             for val in self.values.iter() {
                 let fired = self.compare(target, val);
-                if fired && !self.match_all {
+                if fired && !self.modifier.match_all {
                     return true;
-                } else if !fired && self.match_all {
+                } else if !fired && self.modifier.match_all {
                     return false;
                 }
             }
             // After the loop, there are two options:
             // 1. match_all = false: no condition fired  => return false
             // 2. match_all = true: all conditions fired => return true
-            self.match_all
+            self.modifier.match_all
         } else {
             false
         }
@@ -281,28 +195,28 @@ mod tests {
 
     #[test]
     fn test_parse_name_only() {
-        let field = Field::parse("a").unwrap();
+        let field = Field::from_str("a").unwrap();
         assert_eq!(field.name, "a");
         assert!(field.modifier.match_modifier.is_none());
         assert!(field.modifier.value_transformer.is_none());
-        assert!(!field.match_all);
+        assert!(!field.modifier.match_all);
     }
 
     #[test]
     fn test_parse_contains_modifier() {
-        let field = Field::parse("hello|contains").unwrap();
+        let field = Field::from_str("hello|contains").unwrap();
         assert_eq!(field.name, "hello");
         assert_eq!(
             field.modifier.match_modifier.unwrap(),
             MatchModifier::Contains
         );
         assert!(field.modifier.value_transformer.is_none());
-        assert!(!field.match_all);
+        assert!(!field.modifier.match_all);
     }
 
     #[test]
     fn test_parse_conflicting_modifiers() {
-        let field = Field::parse("hello|contains|startswith");
+        let field = Field::from_str("hello|contains|startswith");
         assert!(field.is_err());
         let err_str = field.unwrap_err().to_string();
         assert_eq!(
@@ -314,7 +228,7 @@ mod tests {
 
     #[test]
     fn test_parse_value_transformer_modifier() {
-        let field = Field::parse("hello|windash|contains").unwrap();
+        let field = Field::from_str("hello|windash|contains").unwrap();
         assert_eq!(field.name, "hello");
         assert_eq!(field.modifier.match_modifier, Some(MatchModifier::Contains));
         assert_eq!(field.modifier.value_transformer, Some(Windash));
@@ -322,7 +236,7 @@ mod tests {
 
     #[test]
     fn test_parse_unknown_modifier() {
-        let field = Field::parse("hello|staartswith");
+        let field = Field::from_str("hello|staartswith");
         assert!(field.is_err());
         assert!(field
             .err()
@@ -333,7 +247,7 @@ mod tests {
 
     #[test]
     fn test_parse_base64_modifier() {
-        let field = Field::parse("hello|base64|endswith").unwrap();
+        let field = Field::from_str("hello|base64|endswith").unwrap();
         assert_eq!(field.name, "hello");
         assert_eq!(field.modifier.match_modifier, Some(MatchModifier::EndsWith));
         assert_eq!(field.modifier.value_transformer, Some(Base64(None)));
@@ -341,7 +255,7 @@ mod tests {
 
     #[test]
     fn test_parse_ambiguous_utf16_modifier() {
-        let field = Field::parse("hello|utf16|base64offset");
+        let field = Field::from_str("hello|utf16|base64offset");
         assert!(field.is_err());
         let err_str = format!("{:?}", field.err().unwrap().to_string());
         assert!(
@@ -353,7 +267,7 @@ mod tests {
 
     #[test]
     fn test_parse_utf16_modifier() {
-        let field = Field::parse("hello|base64offset|utf16le|endswith").unwrap();
+        let field = Field::from_str("hello|base64offset|utf16le|endswith").unwrap();
         assert_eq!(field.name, "hello");
         assert_eq!(field.modifier.match_modifier, Some(MatchModifier::EndsWith));
         assert_eq!(
@@ -364,11 +278,11 @@ mod tests {
 
     #[test]
     fn test_parse_conflicting_re_modifier() {
-        let field = Field::parse("hello|base64offset|utf16le|re");
+        let field = Field::from_str("hello|base64offset|utf16le|re");
         assert!(field.is_err());
         let s = field.unwrap_err().to_string();
         assert_eq!(
-            s, "The modifier 're' must not be combined with other modifiers except 'all'",
+            s, "The modifier 're' must not be combined with other modifiers except 'all' and 'fieldref'",
             "{}",
             s
         );
@@ -376,7 +290,7 @@ mod tests {
 
     #[test]
     fn test_parse_utf16_modifier_without_base64() {
-        let field = Field::parse("hello|utf16be");
+        let field = Field::from_str("hello|utf16be");
         assert!(field.is_err());
         assert!(field
             .err()
@@ -416,7 +330,7 @@ mod tests {
         let event = Event::from([("test", "zsh shutdown")]);
         assert!(field.evaluate(&event));
 
-        field.match_all = true;
+        field.modifier.match_all = true;
         assert!(!field.evaluate(&event));
     }
 
@@ -442,7 +356,7 @@ mod tests {
     fn test_evaluate_contains() {
         let field = Field::new(
             "test|contains",
-            vec![FieldValue::from("zsh"), FieldValue::from("python")],
+            vec![FieldValue::from("zsh"), FieldValue::from("python2")],
         )
         .unwrap();
         let event = Event::from([("test", "zsh python3 -c os.remove('/')")]);
@@ -450,10 +364,10 @@ mod tests {
 
         let field = Field::new(
             "test|contains|all",
-            vec![FieldValue::from("zsh"), FieldValue::from("python")],
+            vec![FieldValue::from("zsh"), FieldValue::from("python2")],
         )
         .unwrap();
-        assert!(field.evaluate(&event));
+        assert!(!field.evaluate(&event));
     }
 
     #[test]
@@ -463,7 +377,7 @@ mod tests {
         let event = Event::from([("test", 10)]);
         assert!(field.evaluate(&event));
 
-        field.match_all = true;
+        field.modifier.match_all = true;
         assert!(!field.evaluate(&event));
     }
 
@@ -474,7 +388,7 @@ mod tests {
         let event = Event::from([("test", 15)]);
         assert!(field.evaluate(&event));
 
-        field.match_all = true;
+        field.modifier.match_all = true;
         assert!(field.evaluate(&event));
     }
 
@@ -484,7 +398,7 @@ mod tests {
         let event = Event::from([("test", 10.2)]);
         assert!(field.evaluate(&event));
 
-        field.match_all = true;
+        field.modifier.match_all = true;
         assert!(field.evaluate(&event));
     }
 
@@ -495,10 +409,10 @@ mod tests {
         let event = Event::from([("test", 15)]);
         assert!(field.evaluate(&event));
 
-        field.match_all = true;
+        field.modifier.match_all = true;
         assert!(field.evaluate(&event));
 
-        field.match_all = false;
+        field.modifier.match_all = false;
 
         // We enforce strict type checking, so 15.0 will fail to compare against the int values
         let event = Event::from([("test", 14.0)]);
@@ -508,7 +422,7 @@ mod tests {
         field.values.push(FieldValue::Float(12.34));
         assert!(field.evaluate(&event));
 
-        field.match_all = true;
+        field.modifier.match_all = true;
         assert!(!field.evaluate(&event));
     }
 
@@ -530,7 +444,7 @@ mod tests {
         let event = Event::from([("test", "hello world")]);
         assert!(field.evaluate(&event));
 
-        field.match_all = true;
+        field.modifier.match_all = true;
         assert!(!field.evaluate(&event));
     }
 
@@ -540,7 +454,6 @@ mod tests {
             name: "test".to_string(),
             values: vec![],
             modifier: Modifier::default(),
-            match_all: false,
         };
 
         assert!(field.compare(&FieldValue::from("zsh"), &FieldValue::from("zsh")));
@@ -558,11 +471,11 @@ mod tests {
 
     #[test]
     fn test_conflicting_cidr_modifier() {
-        let field = Field::new("test|contains|cidr", vec![FieldValue::from(" ")]);
+        let field = Field::new("test|windash|cidr", vec![FieldValue::from(" ")]);
         assert!(field.is_err());
         let err_str = field.err().unwrap().to_string();
-        assert_eq!(
-            err_str, "The modifier 'cidr' must not be combined with other modifiers except 'all'",
+        assert!(
+            err_str.starts_with("The modifier 'cidr' must not be combined with other modifiers"),
             "{}",
             err_str
         );
@@ -570,11 +483,11 @@ mod tests {
 
     #[test]
     fn test_conflicting_cidr_re_modifier() {
-        let field = Field::new("test|contains|cidr|re", vec![FieldValue::from(" ")]);
+        let field = Field::new("test|contains|cidr", vec![FieldValue::from(" ")]);
         assert!(field.is_err());
         let err_str = field.unwrap_err().to_string();
         assert_eq!(
-            err_str, "The field modifiers 're' and 'cidr' are conflicting",
+            err_str, "The field modifiers 'cidr' and 'contains' are conflicting",
             "{}",
             err_str
         );
@@ -593,12 +506,12 @@ mod tests {
 
         let event = Event::from([("test", "10.0.1.1")]);
         assert!(field.evaluate(&event));
-        field.match_all = true;
+        field.modifier.match_all = true;
 
         assert!(!field.evaluate(&event));
 
         let event = Event::from([("test", "10.1.2.3")]);
-        field.match_all = false;
+        field.modifier.match_all = false;
         assert!(!field.evaluate(&event));
     }
 
