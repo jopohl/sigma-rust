@@ -98,20 +98,6 @@ where
     }
 }
 
-impl<T, S> From<HashMap<S, T>> for Event
-where
-    S: Into<String> + Hash + Eq,
-    T: Into<EventValue>,
-{
-    fn from(data: HashMap<S, T>) -> Self {
-        let mut result = Self::default();
-        for (key, val) in data.into_iter() {
-            result.inner.insert(key.into(), val.into());
-        }
-        result
-    }
-}
-
 impl Event {
     /// Create a new empty event
     pub fn new() -> Self {

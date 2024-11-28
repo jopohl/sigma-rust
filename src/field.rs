@@ -596,6 +596,24 @@ mod tests {
     }
 
     #[test]
+    fn test_conflicting_utf16_modifiers() {
+        let field = Field::new("test|base64offset|utf16le|contains|utf16be", vec![]);
+        assert!(field.is_err());
+    }
+
+    #[test]
+    fn test_conflicting_utf16_without_base64() {
+        let field = Field::new("test|base64offset|utf16le", vec![]);
+        assert!(field.is_err());
+    }
+
+    #[test]
+    fn test_conflicting_value_transformers() {
+        let field = Field::new("test|base64offset|windash", vec![]);
+        assert!(field.is_err());
+    }
+
+    #[test]
     fn test_windash() {
         let patterns = ["-my-param", "/another-param"];
         let field = Field::new(
