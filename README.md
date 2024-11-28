@@ -16,7 +16,7 @@ A Rust library for parsing and evaluating Sigma rules to create custom detection
 - Daily automated security audit of dependencies
 - Extensive test suite
 
-[^1] Except the [expand](https://sigmahq.io/docs/basics/modifiers.html#expand) modifier.
+[^1]: Except the [expand](https://sigmahq.io/docs/basics/modifiers.html#expand) modifier.
 
 ## Example
 
