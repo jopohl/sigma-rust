@@ -7,7 +7,7 @@ pub use value::*;
 
 use crate::error::ParserError;
 use crate::error::ParserError::{IPParsing, InvalidYAML};
-use crate::event::Event;
+use crate::event::{Event, EventValue};
 use crate::field::transformation::{encode_base64, encode_base64_offset, windash_variations};
 use crate::field::ValueTransformer::{Base64, Base64offset, Windash};
 use cidr::IpCidr;
@@ -162,7 +162,7 @@ impl Field {
     }
 
     pub(crate) fn evaluate(&self, event: &Event) -> bool {
-        if let Some(target) = event.get(&self.name) {
+        if let Some(EventValue::Value(target)) = event.get(&self.name) {
             if self.values.is_empty() {
                 // self.values should never be empty.
                 // But, if it somehow happens we must return true, because

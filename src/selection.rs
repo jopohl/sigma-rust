@@ -118,11 +118,9 @@ impl TryFrom<Value> for Selection {
 impl Selection {
     pub(crate) fn evaluate(&self, event: &Event) -> bool {
         match &self {
-            Self::Keyword(keywords) => event.iter().any(|(k, v)| {
-                keywords
-                    .iter()
-                    .any(|kw| k.contains(kw) || v.value_to_string().contains(kw))
-            }),
+            Self::Keyword(keywords) => event
+                .values()
+                .any(|v| keywords.iter().any(|kw| v.contains(kw))),
             Self::Field(field_groups) => field_groups.iter().any(|g| g.evaluate(event)),
         }
     }
@@ -143,7 +141,7 @@ mod tests {
             "arch".to_string(),
         ]);
 
-        let event = Event::from([("test", "zsh shutdown")]);
+        let event = Event::from([("key", "zsh shutdown test")]);
         assert!(selection.evaluate(&event));
 
         let event = Event::from([("nomatch", "zsh shutdown".to_string())]);
@@ -167,7 +165,7 @@ mod tests {
                     "name1|contains",
                     vec![FieldValue::from("hello"), FieldValue::from("world")],
                 )
-                .unwrap(),
+                    .unwrap(),
                 Field::new("name2|cidr", vec![FieldValue::from("10.0.0.0/16")]).unwrap(),
             ],
         }]);

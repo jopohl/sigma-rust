@@ -9,6 +9,60 @@ struct EventProxy {
     value: serde_json::Value,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum EventValue {
+    Value(FieldValue),
+    Sequence(Vec<EventValue>),
+    Map(HashMap<String, EventValue>),
+}
+
+#[cfg(feature = "serde_json")]
+impl TryFrom<serde_json::Value> for EventValue {
+    type Error = crate::error::JSONError;
+
+    fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
+        match value {
+            serde_json::Value::Null
+            | serde_json::Value::Bool(_)
+            | serde_json::Value::Number(_)
+            | serde_json::Value::String(_) => Ok(Self::Value(FieldValue::try_from(value)?)),
+            serde_json::Value::Array(a) => {
+                let mut result = Vec::with_capacity(a.len());
+                for item in a {
+                    result.push(Self::try_from(item)?);
+                }
+                Ok(Self::Sequence(result))
+            }
+            serde_json::Value::Object(data) => {
+                let mut result = HashMap::with_capacity(data.len());
+                for (key, value) in data {
+                    result.insert(key, Self::try_from(value)?);
+                }
+                Ok(Self::Map(result))
+            }
+        }
+    }
+}
+
+impl EventValue {
+    pub(crate) fn contains(&self, s: &str) -> bool {
+        match self {
+            Self::Value(v) => v.value_to_string().contains(s),
+            Self::Sequence(seq) => seq.iter().any(|v| v.contains(s)),
+            Self::Map(m) => m.values().any(|v| v.contains(s)),
+        }
+    }
+}
+
+impl<T> From<T> for EventValue
+where
+    T: Into<FieldValue>,
+{
+    fn from(value: T) -> Self {
+        Self::Value(value.into())
+    }
+}
+
 /// The `Event` struct represents a log event.
 ///
 /// It is a collection of key-value pairs
@@ -18,7 +72,7 @@ struct EventProxy {
 #[cfg_attr(feature = "serde_json", derive(serde::Deserialize))]
 #[cfg_attr(feature = "serde_json", serde(try_from = "EventProxy"))]
 pub struct Event {
-    inner: HashMap<String, FieldValue>,
+    inner: HashMap<String, EventValue>,
 }
 
 #[cfg(feature = "serde_json")]
@@ -33,7 +87,7 @@ impl TryFrom<EventProxy> for Event {
 impl<T, S, const N: usize> From<[(S, T); N]> for Event
 where
     S: Into<String> + Hash + Eq,
-    T: Into<FieldValue>,
+    T: Into<EventValue>,
 {
     fn from(values: [(S, T); N]) -> Self {
         let mut data = HashMap::with_capacity(N);
@@ -47,7 +101,7 @@ where
 impl<T, S> From<HashMap<S, T>> for Event
 where
     S: Into<String> + Hash + Eq,
-    T: Into<FieldValue>,
+    T: Into<EventValue>,
 {
     fn from(data: HashMap<S, T>) -> Self {
         let mut result = Self::default();
@@ -79,19 +133,40 @@ impl Event {
     pub fn insert<T, S>(&mut self, key: S, value: T)
     where
         S: Into<String> + Hash + Eq,
-        T: Into<FieldValue>,
+        T: Into<EventValue>,
     {
         self.inner.insert(key.into(), value.into());
     }
 
     /// Iterate over the key-value pairs in the event
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &FieldValue)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &EventValue)> {
         self.inner.iter()
     }
 
-    /// Get the value of a field in the event
-    pub fn get(&self, field: &String) -> Option<&FieldValue> {
-        self.inner.get(field)
+    /// Get the value for a key in the event
+    pub fn get(&self, key: &str) -> Option<&EventValue> {
+        if let Some(ev) = self.inner.get(key) {
+            return Some(ev);
+        }
+
+        let mut nested_key = key;
+        let mut current = &self.inner;
+        while let Some((head, tail)) = nested_key.split_once('.') {
+            if let Some(EventValue::Map(map)) = current.get(head) {
+                if let Some(value) = map.get(tail) {
+                    return Some(value);
+                }
+                current = map;
+                nested_key = tail;
+            } else {
+                return None;
+            }
+        }
+        None
+    }
+
+    pub fn values(&self) -> impl Iterator<Item = &EventValue> {
+        self.inner.values()
     }
 }
 
@@ -104,8 +179,7 @@ impl TryFrom<serde_json::Value> for Event {
         match data {
             serde_json::Value::Object(data) => {
                 for (key, value) in data {
-                    let field_value = FieldValue::try_from(value)?;
-                    result.insert(key, field_value);
+                    result.insert(key, EventValue::try_from(value)?);
                 }
             }
             _ => return Err(Self::Error::InvalidEvent()),
@@ -118,18 +192,31 @@ impl TryFrom<serde_json::Value> for Event {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn test_load_from_json() {
-        let data = r#"
-        {
+        let event: Event = json!({
             "name": "John Doe",
-            "age": 43
-        }"#;
+            "age": 43,
+            "address": {
+                "city": "New York",
+                "state": "NY"
+            }
+        })
+        .try_into()
+        .unwrap();
 
-        let event: Event = serde_json::from_str(data).unwrap();
-
-        assert_eq!(event.inner["name"], FieldValue::from("John Doe"));
-        assert_eq!(event.inner["age"], FieldValue::from(43));
+        assert_eq!(event.inner["name"], EventValue::from("John Doe"));
+        assert_eq!(event.inner["age"], EventValue::from(43));
+        assert_eq!(
+            event.inner["address"],
+            EventValue::Map({
+                let mut map = HashMap::new();
+                map.insert("city".to_string(), EventValue::from("New York"));
+                map.insert("state".to_string(), EventValue::from("NY"));
+                map
+            })
+        );
     }
 }

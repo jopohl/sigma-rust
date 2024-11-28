@@ -121,7 +121,9 @@ impl FromStr for Modifier {
             }
         }
 
-        if let (Some(MatchModifier::Re) | Some(MatchModifier::Cidr), Some(_)) = (&result.match_modifier, &result.value_transformer) {
+        if let (Some(MatchModifier::Re) | Some(MatchModifier::Cidr), Some(_)) =
+            (&result.match_modifier, &result.value_transformer)
+        {
             return Err(Self::Err::StandaloneViolation(
                 result.match_modifier.unwrap().to_string(),
             ));

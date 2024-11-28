@@ -1,3 +1,6 @@
+use serde_json::json;
+use sigma_rust::{check_rule, rule_from_yaml, Event};
+
 #[cfg(feature = "serde_json")]
 #[test]
 fn test_match_event_from_json() {
@@ -80,4 +83,50 @@ fn test_match_multiple_events_from_json() {
     for event in events {
         assert!(check_rule(&rule, &event));
     }
+}
+
+#[cfg(feature = "serde_json")]
+#[test]
+fn test_match_nested_event() {
+    let event: Event = json!({
+        "Image": "test",
+        "Image.source": "somewhere",
+        "User": {
+            "Name": {
+                "First": "Chuck",
+                "Last": "Norris",
+            },
+            "Mobile.phone": "1",
+            "Age": 42,
+        },
+    })
+    .try_into()
+    .unwrap();
+
+    let matching_rule = r#"
+        title: Nested test
+        logsource:
+        detection:
+            selection:
+                Image|endswith: 'st'
+                Image.source|startswith: 'some'
+                User.Name.First: 'Chuck'
+                User.Mobile.phone: '1'
+            condition: selection"#;
+
+    let not_matching_rule = r#"
+        title: Nested test
+        logsource:
+        detection:
+            selection:
+                Image|endswith: 'st'
+                User.Name.First: 'Son'
+                User.Name.Last: 'Goku'
+            condition: selection"#;
+
+    let rule = rule_from_yaml(matching_rule).unwrap();
+    assert!(check_rule(&rule, &event));
+
+    let rule = rule_from_yaml(not_matching_rule).unwrap();
+    assert!(!check_rule(&rule, &event));
 }
