@@ -5,16 +5,18 @@
 [![Crates.io](https://img.shields.io/crates/v/sigma-rust)](https://crates.io/crates/sigma-rust)
 [![Docs.rs](https://docs.rs/sigma-rust/badge.svg)](https://docs.rs/sigma-rust)
 
-
 A Rust library for parsing and evaluating Sigma rules to create custom detection pipelines.
 
 ## Features
 
-- Supports all [sigma modifiers](https://sigmahq.io/docs/basics/modifiers.html) except `expand`
+- Supports all[^1] [sigma modifiers](https://sigmahq.io/docs/basics/modifiers.html) including the unofficial `fieldref`
+  modifier
 - Supports the whole [Sigma condition](https://sigmahq.io/docs/basics/conditions.html) syntax using Pratt parsing
 - Written in 100% safe Rust
 - Daily automated security audit of dependencies
 - Extensive test suite
+
+[^1] Except the [expand](https://sigmahq.io/docs/basics/modifiers.html#expand) modifier.
 
 ## Example
 
@@ -28,6 +30,7 @@ fn main() {
         category: test
     detection:
         selection_1:
+            Event.ID: 42
             TargetFilename|contains: ':\temp\'
             TargetFilename|endswith:
                 - '.au3'
@@ -42,7 +45,7 @@ fn main() {
 
     let rule = rule_from_yaml(rule_yaml).unwrap();
     let event = event_from_json(
-        r#"{"TargetFilename": "C:\\temp\\file.au3", "Image": "C:\\temp\\autoit4.exe"}"#,
+        r#"{"TargetFilename": "C:\\temp\\file.au3", "Image": "C:\\temp\\autoit4.exe", "Event": {"ID": 42}}"#,
     )
         .unwrap();
 
@@ -50,7 +53,31 @@ fn main() {
 }
 ```
 
-Check out the `examples` folder for more examples.
+## Matching nested fields
+
+You can access nested fields by using a dot `.` as a separator. For example, if you have an event like
+
+```json
+{
+  "Event": {
+    "ID": 42
+  }
+}
+```
+
+you can access the `ID` field by using `Event.ID` in the Sigma rule. Note, that fields containing a dot take
+precedence over nested fields. For example, if you have an event like
+
+```json
+{
+  "Event.ID": 42,
+  "Event": {
+    "ID": 43
+  }
+}
+```
+
+the engine will evaluate `Event.ID` to 42.
 
 ## Strong type checking
 
@@ -73,7 +100,6 @@ selection_2:
 condition: 1 of them
 ```
 
-
 ## License
 
 Licensed under either of
@@ -87,4 +113,5 @@ at your option.
 
 Contributions are welcome! Please open an issue or create a pull request.
 
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as
+defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.

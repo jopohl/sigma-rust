@@ -9,7 +9,6 @@ fn test_parse_sigma_main_rules() {
     let sigma_dir = "sigma-main-rules";
     let mut num_successful = 0;
     let mut num_failed = 0;
-    let mut num_ignored = 0;
     let mut total = 0;
     let mut errors = vec![];
 
@@ -28,13 +27,6 @@ fn test_parse_sigma_main_rules() {
                     num_successful += 1;
                 }
                 Err(err) => {
-                    if err
-                        .to_string()
-                        .contains("Unknown field modifier 'fieldref' ")
-                    {
-                        num_ignored += 1;
-                        continue;
-                    }
                     num_failed += 1;
                     errors.push(format!(
                         "Failed to parse YAML file {:?}: {:?}",
@@ -50,11 +42,6 @@ fn test_parse_sigma_main_rules() {
     println!("Parsing {} rules took {:?}", total, duration);
 
     println!("Successfully parsed {} rules", num_successful);
-    println!(
-        // more details: https://github.com/SigmaHQ/sigma/pull/4836#issuecomment-2079248338
-        "Ignored {} rule(s) containing the unofficial 'fieldref' modifier",
-        num_ignored
-    );
     println!("{} rules failed with errors", num_failed);
     for (i, error) in errors.iter().enumerate() {
         println!("{:02}: {}", i + 1, error);

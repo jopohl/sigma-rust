@@ -34,6 +34,7 @@ pub enum ValueTransformer {
 #[derive(Debug, Default)]
 pub struct Modifier {
     pub(crate) match_all: bool,
+    pub(crate) fieldref: bool,
     pub(crate) match_modifier: Option<MatchModifier>,
     pub(crate) value_transformer: Option<ValueTransformer>,
 }
@@ -61,6 +62,10 @@ impl FromStr for Modifier {
         for s in string.split("|").skip(1).map(|s| s.to_lowercase()) {
             if s == "all" {
                 result.match_all = true;
+                continue;
+            }
+            if s == "fieldref" {
+                result.fieldref = true;
                 continue;
             }
 

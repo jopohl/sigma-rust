@@ -100,8 +100,8 @@ fn test_match_nested_event() {
             "Age": 42,
         },
     })
-    .try_into()
-    .unwrap();
+        .try_into()
+        .unwrap();
 
     let matching_rule = r#"
         title: Nested test
@@ -129,4 +129,39 @@ fn test_match_nested_event() {
 
     let rule = rule_from_yaml(not_matching_rule).unwrap();
     assert!(!check_rule(&rule, &event));
+}
+
+#[cfg(feature = "serde_json")]
+#[test]
+fn test_match_fieldref() {
+    let event: Event = json!({
+        "Image": "testing",
+        "User": {
+            "Name": {
+                "First": "Chuck",
+                "Last": "Norris",
+            },
+            "Mobile.phone": "1",
+            "Age": 42,
+            "SomeName": "Chuck",
+        },
+        "reference": "test",
+    })
+        .try_into()
+        .unwrap();
+
+    let matching_rule = r#"
+        title: Fieldref test
+        logsource:
+        detection:
+            selection:
+                Image|fieldref|startswith: reference
+                User.Name.First|fieldref:
+                    - User.SomeName
+                    - reference
+            condition: selection"#;
+
+
+    let rule = rule_from_yaml(matching_rule).unwrap();
+    assert!(check_rule(&rule, &event));
 }

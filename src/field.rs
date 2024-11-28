@@ -172,7 +172,18 @@ impl Field {
             }
 
             for val in self.values.iter() {
-                let fired = self.compare(target, val);
+                let cmp = if self.modifier.fieldref {
+                    if let Some(EventValue::Value(value)) = event.get(val.value_to_string().as_str())
+                    {
+                        value
+                    } else {
+                        continue;
+                    }
+                } else {
+                    val
+                };
+
+                let fired = self.compare(target, cmp);
                 if fired && !self.modifier.match_all {
                     return true;
                 } else if !fired && self.modifier.match_all {
@@ -309,7 +320,7 @@ mod tests {
                 FieldValue::from("pwsh"),
             ],
         )
-        .unwrap();
+            .unwrap();
         let event_no_match = Event::from([("test", "zsh shutdown")]);
         assert!(!field.evaluate(&event_no_match));
         let matching_event = Event::from([("test", "bash")]);
@@ -326,7 +337,7 @@ mod tests {
                 FieldValue::from("pwsh"),
             ],
         )
-        .unwrap();
+            .unwrap();
         let event = Event::from([("test", "zsh shutdown")]);
         assert!(field.evaluate(&event));
 
@@ -340,7 +351,7 @@ mod tests {
             "test|endswith",
             vec![FieldValue::from("h"), FieldValue::from("sh")],
         )
-        .unwrap();
+            .unwrap();
         let event = Event::from([("test", "zsh")]);
         assert!(field.evaluate(&event));
 
@@ -348,7 +359,7 @@ mod tests {
             "test|endswith|all",
             vec![FieldValue::from("h"), FieldValue::from("sh")],
         )
-        .unwrap();
+            .unwrap();
         assert!(field.evaluate(&event));
     }
 
@@ -358,7 +369,7 @@ mod tests {
             "test|contains",
             vec![FieldValue::from("zsh"), FieldValue::from("python2")],
         )
-        .unwrap();
+            .unwrap();
         let event = Event::from([("test", "zsh python3 -c os.remove('/')")]);
         assert!(field.evaluate(&event));
 
@@ -366,7 +377,7 @@ mod tests {
             "test|contains|all",
             vec![FieldValue::from("zsh"), FieldValue::from("python2")],
         )
-        .unwrap();
+            .unwrap();
         assert!(!field.evaluate(&event));
     }
 
@@ -435,7 +446,7 @@ mod tests {
                 FieldValue::from(r"goodbye (.*)"),
             ],
         )
-        .unwrap();
+            .unwrap();
 
         for val in &field.values {
             assert!(matches!(val, FieldValue::Regex(_)));
@@ -502,7 +513,7 @@ mod tests {
             "test|cidr",
             cidrs.into_iter().map(FieldValue::from).collect(),
         )
-        .unwrap();
+            .unwrap();
 
         let event = Event::from([("test", "10.0.1.1")]);
         assert!(field.evaluate(&event));
@@ -525,7 +536,7 @@ mod tests {
                 .map(|x| FieldValue::from(x.to_string()))
                 .collect(),
         )
-        .unwrap();
+            .unwrap();
 
         let event = Event::from([(
             "test",
@@ -552,7 +563,7 @@ mod tests {
             "test|base64offset|utf16le|contains",
             patterns.into_iter().map(FieldValue::from).collect(),
         )
-        .unwrap();
+            .unwrap();
 
         let expected = [
             "QQBkAGQALQBNAHAAUAByAGUAZgBlAHIAZQBuAGMAZQAgA",
@@ -590,7 +601,7 @@ mod tests {
             "test|windash|contains",
             patterns.into_iter().map(FieldValue::from).collect(),
         )
-        .unwrap();
+            .unwrap();
 
         let event = Event::from([("test", "program.exe /my-param")]);
         assert!(field.evaluate(&event));
