@@ -1,7 +1,7 @@
 #[cfg(feature = "serde_json")]
 use serde_json::json;
 #[cfg(feature = "serde_json")]
-use sigma_rust::{check_rule, rule_from_yaml, Event, event_from_json, events_from_json};
+use sigma_rust::{check_rule, event_from_json, events_from_json, rule_from_yaml, Event};
 
 #[cfg(feature = "serde_json")]
 #[test]
@@ -100,8 +100,8 @@ fn test_match_nested_event() {
             "Age": 42,
         },
     })
-        .try_into()
-        .unwrap();
+    .try_into()
+    .unwrap();
 
     let matching_rule = r#"
         title: Nested test
@@ -147,8 +147,8 @@ fn test_match_fieldref() {
         },
         "reference": "test",
     })
-        .try_into()
-        .unwrap();
+    .try_into()
+    .unwrap();
 
     let matching_rule = r#"
         title: Fieldref test
@@ -160,7 +160,6 @@ fn test_match_fieldref() {
                     - User.SomeName
                     - reference
             condition: selection"#;
-
 
     let rule = rule_from_yaml(matching_rule).unwrap();
     assert!(check_rule(&rule, &event));

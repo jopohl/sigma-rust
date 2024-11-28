@@ -165,7 +165,7 @@ mod tests {
                     "name1|contains",
                     vec![FieldValue::from("hello"), FieldValue::from("world")],
                 )
-                    .unwrap(),
+                .unwrap(),
                 Field::new("name2|cidr", vec![FieldValue::from("10.0.0.0/16")]).unwrap(),
             ],
         }]);
