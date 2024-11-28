@@ -1,10 +1,11 @@
+#[cfg(feature = "serde_json")]
 use serde_json::json;
-use sigma_rust::{check_rule, rule_from_yaml, Event};
+#[cfg(feature = "serde_json")]
+use sigma_rust::{check_rule, rule_from_yaml, Event, event_from_json, events_from_json};
 
 #[cfg(feature = "serde_json")]
 #[test]
 fn test_match_event_from_json() {
-    use sigma_rust::{check_rule, event_from_json, rule_from_yaml};
     let json = r#"
         {
             "Image": "C:\\rundll32.exe",
@@ -42,7 +43,6 @@ fn test_match_event_from_json() {
 #[cfg(feature = "serde_json")]
 #[test]
 fn test_match_multiple_events_from_json() {
-    use sigma_rust::{check_rule, events_from_json, rule_from_yaml};
     let events_json = r#"
         [
             {
