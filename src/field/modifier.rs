@@ -167,8 +167,14 @@ mod test {
     }
 
     #[test]
-    fn test_conflicting_utf16_without_base64() {
-        let err = Modifier::from_str("test|utf16le").unwrap_err();
+    fn test_value_transformer_utf16_without_base64() {
+        let err = Modifier::from_str("test|windash|utf16le").unwrap_err();
+        assert!(matches!(err, ParserError::Utf16WithoutBase64));
+    }
+
+    #[test]
+    fn test_utf16_without_base64() {
+        let err = Modifier::from_str("test|utf16be").unwrap_err();
         assert!(matches!(err, ParserError::Utf16WithoutBase64));
     }
 
@@ -181,26 +187,18 @@ mod test {
     #[test]
     fn test_conflicting_cidr_modifier() {
         let err = Modifier::from_str("test|windash|cidr").unwrap_err();
-        assert!(
-            matches!(
-                err,
-                ParserError::StandaloneViolation(ref a) if a == "cidr",
-            ),
-            "{:?}",
-            err
-        );
+        assert!(matches!(
+            err,
+            ParserError::StandaloneViolation(ref a) if a == "cidr",
+        ));
     }
 
     #[test]
     fn test_conflicting_cidr_re_modifier() {
         let err = Modifier::from_str("test|re|cidr").unwrap_err();
-        assert!(
-            matches!(
-                err,
-                ParserError::ConflictingModifiers(ref a, ref b) if a == "cidr" && b == "re",
-            ),
-            "{:?}",
-            err
-        );
+        assert!(matches!(
+            err,
+            ParserError::ConflictingModifiers(ref a, ref b) if a == "cidr" && b == "re",
+        ));
     }
 }
