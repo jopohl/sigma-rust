@@ -137,3 +137,70 @@ impl FromStr for Modifier {
         Ok(result)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_unknown_modifier() {
+        let err = Modifier::from_str("test|staartswith").unwrap_err();
+        assert!(matches!(err, ParserError::UnknownModifier(ref a) if a == "staartswith"));
+    }
+
+    #[test]
+    fn test_parse_conflicting_startswith_endswith_modifiers() {
+        let err = Modifier::from_str("hello|contains|startswith").unwrap_err();
+        assert!(matches!(err, ParserError::ConflictingModifiers(_, _)));
+    }
+
+    #[test]
+    fn test_ambiguous_utf16_modifier() {
+        let err = Modifier::from_str("hello|base64offset|utf16").unwrap_err();
+        assert!(matches!(err, ParserError::AmbiguousUtf16Modifier(ref a) if a == "utf16"));
+    }
+
+    #[test]
+    fn test_conflicting_utf16_modifiers() {
+        let err = Modifier::from_str("test|base64offset|utf16le|contains|utf16be").unwrap_err();
+        assert!(matches!(err, ParserError::ConflictingModifiers(_, _)));
+    }
+
+    #[test]
+    fn test_conflicting_utf16_without_base64() {
+        let err = Modifier::from_str("test|utf16le").unwrap_err();
+        assert!(matches!(err, ParserError::Utf16WithoutBase64));
+    }
+
+    #[test]
+    fn test_conflicting_value_transformers() {
+        let err = Modifier::from_str("test|base64offset|windash").unwrap_err();
+        assert!(matches!(err, ParserError::ConflictingModifiers(_, _)));
+    }
+
+    #[test]
+    fn test_conflicting_cidr_modifier() {
+        let err = Modifier::from_str("test|windash|cidr").unwrap_err();
+        assert!(
+            matches!(
+                err,
+                ParserError::StandaloneViolation(ref a) if a == "cidr",
+            ),
+            "{:?}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_conflicting_cidr_re_modifier() {
+        let err = Modifier::from_str("test|re|cidr").unwrap_err();
+        assert!(
+            matches!(
+                err,
+                ParserError::ConflictingModifiers(ref a, ref b) if a == "cidr" && b == "re",
+            ),
+            "{:?}",
+            err
+        );
+    }
+}

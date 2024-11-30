@@ -157,15 +157,8 @@ mod tests {
 
     #[test]
     fn test_missing_identifier() {
-        let d = Detection::new(HashMap::new(), "selection1 and selection2");
-
-        assert!(d.is_err());
-        let err_str = d.unwrap_err().to_string();
-        assert!(
-            err_str.contains("Condition references undefined identifiers:"),
-            "{}",
-            err_str
-        );
+        let err = Detection::new(HashMap::new(), "selection1 and selection2").unwrap_err();
+        assert!(matches!(err, ParserError::UndefinedIdentifiers(_)));
     }
 
     #[test]

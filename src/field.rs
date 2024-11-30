@@ -227,34 +227,11 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_conflicting_modifiers() {
-        let field = Field::from_str("hello|contains|startswith");
-        assert!(field.is_err());
-        let err_str = field.unwrap_err().to_string();
-        assert_eq!(
-            err_str, "The field modifiers 'startswith' and 'contains' are conflicting",
-            "{}",
-            err_str
-        );
-    }
-
-    #[test]
     fn test_parse_value_transformer_modifier() {
         let field = Field::from_str("hello|windash|contains").unwrap();
         assert_eq!(field.name, "hello");
         assert_eq!(field.modifier.match_modifier, Some(MatchModifier::Contains));
         assert_eq!(field.modifier.value_transformer, Some(Windash));
-    }
-
-    #[test]
-    fn test_parse_unknown_modifier() {
-        let field = Field::from_str("hello|staartswith");
-        assert!(field.is_err());
-        assert!(field
-            .err()
-            .unwrap()
-            .to_string()
-            .contains("Unknown field modifier"));
     }
 
     #[test]
@@ -266,18 +243,6 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_ambiguous_utf16_modifier() {
-        let field = Field::from_str("hello|utf16|base64offset");
-        assert!(field.is_err());
-        let err_str = format!("{:?}", field.err().unwrap().to_string());
-        assert!(
-            err_str.contains("use utf16le or utf16be instead"),
-            "{}",
-            err_str
-        );
-    }
-
-    #[test]
     fn test_parse_utf16_modifier() {
         let field = Field::from_str("hello|base64offset|utf16le|endswith").unwrap();
         assert_eq!(field.name, "hello");
@@ -286,29 +251,6 @@ mod tests {
             field.modifier.value_transformer,
             Some(Base64offset(Some(Utf16Modifier::Utf16le)))
         );
-    }
-
-    #[test]
-    fn test_parse_conflicting_re_modifier() {
-        let field = Field::from_str("hello|base64offset|utf16le|re");
-        assert!(field.is_err());
-        let s = field.unwrap_err().to_string();
-        assert_eq!(
-            s, "The modifier 're' must not be combined with other modifiers except 'all' and 'fieldref'",
-            "{}",
-            s
-        );
-    }
-
-    #[test]
-    fn test_parse_utf16_modifier_without_base64() {
-        let field = Field::from_str("hello|utf16be");
-        assert!(field.is_err());
-        assert!(field
-            .err()
-            .unwrap()
-            .to_string()
-            .contains("UTF16 encoding requested but no value transformation modifier provided"));
     }
 
     #[test]
@@ -482,32 +424,6 @@ mod tests {
     }
 
     #[test]
-    fn test_conflicting_cidr_modifier() {
-        let field = Field::new("test|windash|cidr", vec![FieldValue::from(" ")]);
-        assert!(field.is_err());
-        let err_str = field.err().unwrap().to_string();
-        assert!(
-            err_str.starts_with("The modifier 'cidr' must not be combined with other modifiers"),
-            "{}",
-            err_str
-        );
-    }
-
-    #[test]
-    fn test_conflicting_cidr_re_modifier() {
-        let field = Field::new("test|contains|cidr", vec![FieldValue::from(" ")]);
-        assert!(field.is_err());
-        let err_str = field.unwrap_err().to_string();
-        assert_eq!(
-            err_str, "The field modifiers 'cidr' and 'contains' are conflicting",
-            "{}",
-            err_str
-        );
-        assert!(err_str.to_string().contains("re"), "{}", err_str);
-        assert!(err_str.to_string().contains("cidr"), "{}", err_str);
-    }
-
-    #[test]
     fn test_cidr() {
         let cidrs = ["10.0.0.0/16", "10.0.0.0/24"];
         let mut field = Field::new(
@@ -596,24 +512,6 @@ mod tests {
     }
 
     #[test]
-    fn test_conflicting_utf16_modifiers() {
-        let field = Field::new("test|base64offset|utf16le|contains|utf16be", vec![]);
-        assert!(field.is_err());
-    }
-
-    #[test]
-    fn test_conflicting_utf16_without_base64() {
-        let field = Field::new("test|base64offset|utf16le", vec![]);
-        assert!(field.is_err());
-    }
-
-    #[test]
-    fn test_conflicting_value_transformers() {
-        let field = Field::new("test|base64offset|windash", vec![]);
-        assert!(field.is_err());
-    }
-
-    #[test]
     fn test_windash() {
         let patterns = ["-my-param", "/another-param"];
         let field = Field::new(
@@ -632,15 +530,7 @@ mod tests {
     #[test]
     fn test_invalid_contains() {
         let values: Vec<FieldValue> = vec![FieldValue::from("ok"), FieldValue::Int(5)];
-
-        let result = Field::new("test|contains", values);
-        assert!(result.is_err());
-        let err_str = result.unwrap_err().to_string();
-        assert_eq!(
-            err_str,
-            "The modifiers contains, startswith and endswith must be used with string values, got: 'Int(5)'",
-            "{}",
-            err_str
-        );
+        let err = Field::new("test|contains", values).unwrap_err();
+        assert!(matches!(err, ParserError::InvalidValueForStringModifier(_)));
     }
 }

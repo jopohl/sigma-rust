@@ -224,10 +224,11 @@ mod tests {
     "#;
 
         let value: Value = serde_yml::from_str(yaml).unwrap();
-        let r = Selection::try_from(value);
-        assert!(r.is_err());
-        let s = r.unwrap_err().to_string();
-        assert!(s.contains("Invalid keyword selection"), "{}", s);
+        let err = Selection::try_from(value).unwrap_err();
+        assert!(matches!(
+            err,
+            ParserError::SelectionParsingError(_, InvalidKeywordSelection(_)),
+        ));
     }
 
     #[test]

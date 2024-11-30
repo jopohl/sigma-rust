@@ -1,4 +1,3 @@
-use crate::detection::ast::Ast::Selection;
 use crate::detection::lexer::{Lexer, Token};
 use crate::error::ParserError;
 use std::collections::HashSet;
@@ -44,7 +43,7 @@ pub(crate) enum Ast {
 
 impl Default for Ast {
     fn default() -> Self {
-        Selection("".to_string())
+        Self::Selection("".to_string())
     }
 }
 
@@ -174,14 +173,8 @@ mod tests {
 
     #[test]
     fn test_mismatching_parentheses() {
-        let ast = Ast::new("x and ( y or z ");
-        assert!(ast.is_err());
-        let err_str = ast.unwrap_err().to_string();
-        assert_eq!(
-            err_str, "Missing closing parenthesis in condition",
-            "{}",
-            err_str
-        );
+        let err = Ast::new("x and ( y or z ").unwrap_err();
+        assert!(matches!(err, ParserError::MissingClosingParenthesis()));
     }
 
     #[test]
@@ -193,13 +186,8 @@ mod tests {
 
     #[test]
     fn test_selections_without_logical_operator() {
-        let ast = Ast::new(" write TargetLogonId from selection1 (if not selection2) ");
-        assert!(ast.is_err());
-        let err_str = ast.unwrap_err().to_string();
-        assert_eq!(
-            err_str, "Encountered invalid operator 'TargetLogonId' in condition",
-            "{}",
-            err_str
-        );
+        let err =
+            Ast::new(" write TargetLogonId from selection1 (if not selection2) ").unwrap_err();
+        assert!(matches!(err, ParserError::InvalidOperator(ref a) if a == "TargetLogonId"));
     }
 }
