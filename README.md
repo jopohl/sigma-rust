@@ -9,14 +9,11 @@ A Rust library for parsing and evaluating Sigma rules to create custom detection
 
 ## Features
 
-- Supports all[^1] [sigma modifiers](https://sigmahq.io/docs/basics/modifiers.html) including the unofficial `fieldref`
-  modifier
-- Supports the whole [Sigma condition](https://sigmahq.io/docs/basics/conditions.html) syntax using Pratt parsing
+- Supports the [Sigma condition](https://sigmahq.io/docs/basics/conditions.html) syntax using Pratt parsing
+- Wide support for [sigma modifiers](https://sigmahq.io/docs/basics/modifiers.html)
 - Written in 100% safe Rust
 - Daily automated security audit of dependencies
 - Extensive test suite
-
-[^1]: Except the [expand](https://sigmahq.io/docs/basics/modifiers.html#expand) modifier.
 
 ## Example
 

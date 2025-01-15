@@ -23,6 +23,19 @@ pub struct Field {
     pub(crate) modifier: Modifier,
 }
 
+/// Lowercase the given value if it is a string and the cased modifier is not provided
+macro_rules! conditional_lowercase {
+    ($value:expr, $cased:expr) => {
+        if $cased {
+            $value
+        } else if let FieldValue::String(s) = $value {
+            &FieldValue::String(s.to_lowercase())
+        } else {
+            $value
+        }
+    };
+}
+
 impl FromStr for Field {
     type Err = ParserError;
 
@@ -171,17 +184,19 @@ impl Field {
                 return true;
             }
 
+            let target = conditional_lowercase!(target, self.modifier.cased);
+
             for val in self.values.iter() {
                 let cmp = if self.modifier.fieldref {
                     if let Some(EventValue::Value(value)) =
                         event.get(val.value_to_string().as_str())
                     {
-                        value
+                        conditional_lowercase!(value, self.modifier.cased)
                     } else {
                         continue;
                     }
                 } else {
-                    val
+                    conditional_lowercase!(val, self.modifier.cased)
                 };
 
                 let fired = self.compare(target, cmp);
@@ -259,12 +274,21 @@ mod tests {
             "test",
             vec![
                 FieldValue::from("zsh"),
-                FieldValue::from("bash"),
+                FieldValue::from("BASH"),
                 FieldValue::from("pwsh"),
             ],
         )
         .unwrap();
         let event_no_match = Event::from([("test", "zsh shutdown")]);
+        assert!(!field.evaluate(&event_no_match));
+        let matching_event = Event::from([("test", "bash")]);
+        assert!(field.evaluate(&matching_event));
+    }
+
+    #[test]
+    fn test_evaluate_equals_cased() {
+        let field = Field::new("test|cased", vec![FieldValue::from("bash")]).unwrap();
+        let event_no_match = Event::from([("test", "BASH")]);
         assert!(!field.evaluate(&event_no_match));
         let matching_event = Event::from([("test", "bash")]);
         assert!(field.evaluate(&matching_event));

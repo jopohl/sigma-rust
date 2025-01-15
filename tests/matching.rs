@@ -121,3 +121,43 @@ fn test_match_null_fields() {
     assert!(rule.is_match(&event_1));
     assert!(!rule.is_match(&event_2));
 }
+
+#[test]
+fn test_match_cased_contains_modifier() {
+    let yaml = r#"
+    title: Rule with cased modifier
+    logsource:
+    detection:
+        selection:
+            - File|contains|cased: evil
+        condition: selection
+    "#;
+
+    let rule = rule_from_yaml(yaml).unwrap();
+    let event_1 = Event::from([("File", "c:\\evil.exe")]);
+    let event_2 = Event::from([("File", "C:\\EVIL.exe")]);
+
+    assert!(rule.is_match(&event_1));
+    assert!(!rule.is_match(&event_2));
+}
+
+#[test]
+fn test_match_cased_windash() {
+    let yaml = r#"
+    title: Rule with cased modifier
+    logsource:
+    detection:
+        selection:
+            - CMD|windash|cased: -force
+        condition: selection
+    "#;
+
+    let rule = rule_from_yaml(yaml).unwrap();
+    let event_1 = Event::from([("CMD", "-force")]);
+    let event_2 = Event::from([("CMD", "-FORCE")]);
+    let event_3 = Event::from([("CMD", "/force")]);
+
+    assert!(rule.is_match(&event_1));
+    assert!(!rule.is_match(&event_2));
+    assert!(rule.is_match(&event_3));
+}

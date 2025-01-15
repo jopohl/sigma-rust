@@ -122,24 +122,20 @@ impl Detection {
                 .selections
                 .keys()
                 .filter(|name| glob_match(s, name))
-                .map(|name| self.evaluate_selection(name, lookup, event))
-                .any(|b| b),
+                .any(|name| self.evaluate_selection(name, lookup, event)),
             Ast::OneOfThem => self
                 .selections
                 .keys()
-                .map(|name| self.evaluate_selection(name, lookup, event))
-                .any(|b| b),
+                .any(|name| self.evaluate_selection(name, lookup, event)),
             Ast::AllOf(s) => self
                 .selections
                 .keys()
                 .filter(|name| glob_match(s, name))
-                .map(|name| self.evaluate_selection(name, lookup, event))
-                .all(|b| b),
+                .all(|name| self.evaluate_selection(name, lookup, event)),
             Ast::AllOfThem => self
                 .selections
                 .keys()
-                .map(|name| self.evaluate_selection(name, lookup, event))
-                .all(|b| b),
+                .all(|name| self.evaluate_selection(name, lookup, event)),
             Ast::Not(ref operand) => !self.eval(event, operand, lookup),
             Ast::Or(ref left, ref right) => {
                 self.eval(event, left, lookup) || self.eval(event, right, lookup)
