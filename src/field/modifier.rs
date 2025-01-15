@@ -35,6 +35,7 @@ pub enum ValueTransformer {
 pub struct Modifier {
     pub(crate) match_all: bool,
     pub(crate) fieldref: bool,
+    pub(crate) cased: bool,
     pub(crate) match_modifier: Option<MatchModifier>,
     pub(crate) value_transformer: Option<ValueTransformer>,
 }
@@ -66,6 +67,10 @@ impl FromStr for Modifier {
             }
             if s == "fieldref" {
                 result.fieldref = true;
+                continue;
+            }
+            if s == "cased" {
+                result.cased = true;
                 continue;
             }
 
