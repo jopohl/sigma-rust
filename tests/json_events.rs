@@ -163,6 +163,17 @@ fn test_match_fieldref() {
 
     let rule = rule_from_yaml(matching_rule).unwrap();
     assert!(check_rule(&rule, &event));
+
+    let not_matching_rule = r#"
+    title: Fieldref test
+    logsource:
+    detection:
+        selection:
+            Image|fieldref: field_not_in_event
+        condition: selection"#;
+
+    let rule = rule_from_yaml(not_matching_rule).unwrap();
+    assert!(!check_rule(&rule, &event));
 }
 
 #[cfg(feature = "serde_json")]
