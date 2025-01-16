@@ -10,7 +10,7 @@ A Rust library for parsing and evaluating Sigma rules to create custom detection
 ## Features
 
 - Supports the [Sigma condition](https://sigmahq.io/docs/basics/conditions.html) syntax using Pratt parsing
-- Supports all [Sigma field modifiers](https://sigmahq.io/docs/basics/modifiers.html) except `expand` and `exists`
+- Supports all [Sigma field modifiers](https://sigmahq.io/docs/basics/modifiers.html) except `expand`
 - Written in 100% safe Rust
 - Daily automated security audit of dependencies
 - Extensive test suite

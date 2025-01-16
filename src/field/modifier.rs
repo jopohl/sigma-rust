@@ -31,11 +31,12 @@ pub enum ValueTransformer {
     Windash,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Modifier {
     pub(crate) match_all: bool,
     pub(crate) fieldref: bool,
     pub(crate) cased: bool,
+    pub(crate) exists: Option<bool>,
     pub(crate) match_modifier: Option<MatchModifier>,
     pub(crate) value_transformer: Option<ValueTransformer>,
 }
@@ -71,6 +72,12 @@ impl FromStr for Modifier {
             }
             if s == "cased" {
                 result.cased = true;
+                continue;
+            }
+            if s == "exists" {
+                // The real value of the exists modifier will be set during field parsing
+                // because it is the field value and here we only parse the field name.
+                result.exists = Some(bool::default());
                 continue;
             }
 
@@ -139,6 +146,17 @@ impl FromStr for Modifier {
             ));
         }
 
+        if result.exists.is_some() {
+            let tmp = Self {
+                exists: Some(bool::default()),
+                ..Default::default()
+            };
+
+            if result != tmp {
+                return Err(Self::Err::ExistsNotStandalone());
+            };
+        }
+
         Ok(result)
     }
 }
@@ -205,5 +223,17 @@ mod test {
             err,
             ParserError::ConflictingModifiers(ref a, ref b) if a == "cidr" && b == "re",
         ));
+    }
+
+    #[test]
+    fn test_exists_modifier() {
+        let modifier = Modifier::from_str("fieldname|exists").unwrap();
+        assert!(modifier.exists.is_some());
+    }
+
+    #[test]
+    fn test_conflicting_exists_modifier() {
+        let err = Modifier::from_str("fieldname|all|exists").unwrap_err();
+        assert!(matches!(err, ParserError::ExistsNotStandalone()));
     }
 }

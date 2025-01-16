@@ -161,3 +161,28 @@ fn test_match_cased_windash() {
     assert!(!rule.is_match(&event_2));
     assert!(rule.is_match(&event_3));
 }
+
+#[test]
+fn test_match_exists_modifier() {
+    let yaml = r#"
+        title: Existential test
+        logsource:
+        detection:
+            selection:
+                Image|exists: true
+                OriginalFileName|exists: false
+            condition: selection
+    "#;
+
+    let rule = rule_from_yaml(yaml).unwrap();
+    let event_1 = Event::from([("Image", "C:\\rundll32.exe")]);
+    let event_2 = Event::from([
+        ("Image", "C:\\rundll32.exe"),
+        ("OriginalFileName", "RUNDLL32.EXE"),
+    ]);
+    let event_3 = Event::from([("SomeField", "SomeValue")]);
+
+    assert!(rule.is_match(&event_1));
+    assert!(!rule.is_match(&event_2));
+    assert!(!rule.is_match(&event_3));
+}
