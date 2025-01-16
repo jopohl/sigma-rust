@@ -571,6 +571,13 @@ mod tests {
     }
 
     #[test]
+    fn test_empty_values() {
+        let values: Vec<FieldValue> = vec![];
+        let err = Field::new("test|contains", values).unwrap_err();
+        assert!(matches!(err, ParserError::EmptyValues(a) if a == "test"));
+    }
+
+    #[test]
     fn test_invalid_contains() {
         let values: Vec<FieldValue> = vec![FieldValue::from("ok"), FieldValue::Int(5)];
         let err = Field::new("test|contains", values).unwrap_err();
