@@ -180,7 +180,7 @@ fn test_match_exists_modifier() {
         ("Image", "C:\\rundll32.exe"),
         ("OriginalFileName", "RUNDLL32.EXE"),
     ]);
-    let event_3 = Event::from([("OriginalFileName", "")]);
+    let event_3 = Event::from([("SomeField", "SomeValue")]);
 
     assert!(rule.is_match(&event_1));
     assert!(!rule.is_match(&event_2));
