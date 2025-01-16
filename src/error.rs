@@ -26,6 +26,12 @@ pub enum ParserError {
     )]
     StandaloneViolation(String),
 
+    #[error("The 'exists' modifier must not be combined with any other modifiers")]
+    ExistsNotStandalone(),
+
+    #[error("The 'exists' modifier requires a single boolean value")]
+    InvalidValueForExists(),
+
     #[error("Failed to parse IP address '{0}': '{1}'")]
     IPParsing(String, String),
 

@@ -89,6 +89,17 @@ impl Field {
             return Err(ParserError::EmptyValues(self.name.to_string()));
         }
 
+        if self.modifier.exists.is_some() {
+            if self.values.len() != 1 {
+                return Err(ParserError::InvalidValueForExists());
+            }
+            if let FieldValue::Boolean(b) = self.values[0] {
+                self.modifier.exists = Some(b);
+            } else {
+                return Err(ParserError::InvalidValueForExists());
+            }
+        }
+
         match self.modifier.match_modifier {
             Some(MatchModifier::Contains)
             | Some(MatchModifier::StartsWith)
@@ -175,44 +186,52 @@ impl Field {
     }
 
     pub(crate) fn evaluate(&self, event: &Event) -> bool {
-        if let Some(EventValue::Value(target)) = event.get(&self.name) {
-            if self.values.is_empty() {
-                // self.values should never be empty.
-                // But, if it somehow happens we must return true, because
-                //      1. the key exists in the event, and
-                //      2. the field has no further conditions defined
-                return true;
-            }
+        let Some(event_value) = event.get(&self.name) else {
+            return matches!(self.modifier.exists, Some(false));
+        };
 
-            let target = conditional_lowercase!(target, self.modifier.cased);
+        if matches!(self.modifier.exists, Some(true)) {
+            return true;
+        };
 
-            for val in self.values.iter() {
-                let cmp = if self.modifier.fieldref {
-                    if let Some(EventValue::Value(value)) =
-                        event.get(val.value_to_string().as_str())
-                    {
-                        conditional_lowercase!(value, self.modifier.cased)
-                    } else {
-                        continue;
-                    }
-                } else {
-                    conditional_lowercase!(val, self.modifier.cased)
-                };
+        let EventValue::Value(target) = event_value else {
+            // We currently do not support matching against lists and hashmaps, see
+            // https://github.com/jopohl/sigma-rust/issues/9
+            return false;
+        };
 
-                let fired = self.compare(target, cmp);
-                if fired && !self.modifier.match_all {
-                    return true;
-                } else if !fired && self.modifier.match_all {
-                    return false;
-                }
-            }
-            // After the loop, there are two options:
-            // 1. match_all = false: no condition fired  => return false
-            // 2. match_all = true: all conditions fired => return true
-            self.modifier.match_all
-        } else {
-            false
+        if self.values.is_empty() {
+            // self.values should never be empty.
+            // But, if it somehow happens we must return true, because
+            //      1. the key exists in the event, and
+            //      2. the field has no further conditions defined
+            return true;
         }
+
+        let target = conditional_lowercase!(target, self.modifier.cased);
+
+        for val in self.values.iter() {
+            let cmp = if self.modifier.fieldref {
+                if let Some(EventValue::Value(value)) = event.get(val.value_to_string().as_str()) {
+                    conditional_lowercase!(value, self.modifier.cased)
+                } else {
+                    continue;
+                }
+            } else {
+                conditional_lowercase!(val, self.modifier.cased)
+            };
+
+            let fired = self.compare(target, cmp);
+            if fired && !self.modifier.match_all {
+                return true;
+            } else if !fired && self.modifier.match_all {
+                return false;
+            }
+        }
+        // After the loop, there are two options:
+        // 1. match_all = false: no condition fired  => return false
+        // 2. match_all = true: all conditions fired => return true
+        self.modifier.match_all
     }
 }
 
@@ -556,5 +575,34 @@ mod tests {
         let values: Vec<FieldValue> = vec![FieldValue::from("ok"), FieldValue::Int(5)];
         let err = Field::new("test|contains", values).unwrap_err();
         assert!(matches!(err, ParserError::InvalidValueForStringModifier(_)));
+    }
+
+    #[test]
+    fn test_parse_exists_modifier() {
+        let values: Vec<FieldValue> = vec![FieldValue::from(true)];
+        let field = Field::new("test|exists", values).unwrap();
+        assert!(field.modifier.exists.unwrap());
+
+        let values: Vec<FieldValue> = vec![FieldValue::from(false)];
+        let field = Field::new("test|exists", values).unwrap();
+        assert!(!field.modifier.exists.unwrap());
+    }
+
+    #[test]
+    fn test_parse_exists_modifier_invalid_values() {
+        let values_vec: Vec<Vec<FieldValue>> = vec![
+            vec![FieldValue::from("not a boolean")],
+            vec![FieldValue::from("something"), FieldValue::Float(5.0)],
+            vec![FieldValue::from(true), FieldValue::from(true)],
+        ];
+
+        for values in values_vec {
+            let err = Field::new("test|exists", values).unwrap_err();
+            assert!(
+                matches!(err, ParserError::InvalidValueForExists()),
+                "{:?}",
+                err
+            );
+        }
     }
 }
