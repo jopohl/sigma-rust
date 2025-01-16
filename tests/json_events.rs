@@ -164,3 +164,34 @@ fn test_match_fieldref() {
     let rule = rule_from_yaml(matching_rule).unwrap();
     assert!(check_rule(&rule, &event));
 }
+
+#[cfg(feature = "serde_json")]
+#[test]
+fn test_nested_exists() {
+    let event: Event = json!({
+        "Image": "testing",
+        "User": {
+            "Name": {
+                "First": ["Chuck"],
+                "Last": "Norris",
+            },
+            "Mobile.phone": "1",
+            "Age": 42,
+            "SomeName": "Chuck",
+        },
+        "reference": "test",
+    })
+    .try_into()
+    .unwrap();
+
+    let matching_rule = r#"
+        title: Fieldref test
+        logsource:
+        detection:
+            selection:
+                User.Name.First|exists: true
+            condition: selection"#;
+
+    let rule = rule_from_yaml(matching_rule).unwrap();
+    assert!(check_rule(&rule, &event));
+}
