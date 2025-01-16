@@ -185,7 +185,7 @@ fn test_nested_exists() {
     .unwrap();
 
     let matching_rule = r#"
-        title: Fieldref test
+        title: Nested exists test
         logsource:
         detection:
             selection:
