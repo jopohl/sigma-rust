@@ -605,11 +605,7 @@ mod tests {
 
         for values in values_vec {
             let err = Field::new("test|exists", values).unwrap_err();
-            assert!(
-                matches!(err, ParserError::InvalidValueForExists()),
-                "{:?}",
-                err
-            );
+            assert!(matches!(err, ParserError::InvalidValueForExists()));
         }
     }
 }
