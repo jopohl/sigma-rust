@@ -1,7 +1,7 @@
 [package]
 name = "sigma-rust"
 description = "A library for parsing and evaluating Sigma rules to create custom detection pipelines"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 authors = ["Dr.-Ing. Johannes Pohl <johannes.pohl90@gmail.com>"]
 categories = ["parser-implementations", "data-structures"]
