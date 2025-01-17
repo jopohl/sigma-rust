@@ -10,11 +10,6 @@ pub enum ParserError {
     )]
     Utf16WithoutBase64,
 
-    #[error(
-        "The modifier '{0}' is ambiguous and therefore unsupported; use utf16le or utf16be instead"
-    )]
-    AmbiguousUtf16Modifier(String),
-
     #[error("No values provided for field '{0}'")]
     EmptyValues(String),
 

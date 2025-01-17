@@ -21,6 +21,8 @@ pub enum MatchModifier {
 pub enum Utf16Modifier {
     Utf16le,
     Utf16be,
+    Utf16,
+    Wide,
 }
 
 #[derive(Debug, PartialEq, Display, EnumString)]
@@ -48,7 +50,8 @@ impl FromStr for Utf16Modifier {
         match s.to_lowercase().as_str() {
             "utf16le" => Ok(Utf16Modifier::Utf16le),
             "utf16be" => Ok(Utf16Modifier::Utf16be),
-            "utf16" | "wide" => Err(ParserError::AmbiguousUtf16Modifier(s.to_string())),
+            "utf16" => Ok(Utf16Modifier::Utf16),
+            "wide" => Ok(Utf16Modifier::Wide),
             _ => Err(ParserError::UnknownModifier(s.to_string())),
         }
     }
@@ -175,12 +178,6 @@ mod test {
     fn test_parse_conflicting_startswith_endswith_modifiers() {
         let err = Modifier::from_str("hello|contains|startswith").unwrap_err();
         assert!(matches!(err, ParserError::ConflictingModifiers(_, _)));
-    }
-
-    #[test]
-    fn test_ambiguous_utf16_modifier() {
-        let err = Modifier::from_str("hello|base64offset|utf16").unwrap_err();
-        assert!(matches!(err, ParserError::AmbiguousUtf16Modifier(ref a) if a == "utf16"));
     }
 
     #[test]
