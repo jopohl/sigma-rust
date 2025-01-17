@@ -24,7 +24,11 @@ serde_json = { version = "1.0.132", optional = true }
 
 [dev-dependencies]
 walkdir = "2.5.0"
+criterion = { version = "0.5", features = ["html_reports"] }
 
+[[bench]]
+name = "my_benchmark"
+harness = false
 
 [features]
 default = ["serde_json"]
