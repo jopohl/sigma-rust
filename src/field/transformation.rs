@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 pub fn encode_base64(input: &FieldValue, utf16modifier: &Option<Utf16Modifier>) -> String {
     let mut encoded = match utf16modifier {
-        Some(Utf16Modifier::Utf16le) => STANDARD_NO_PAD.encode(
+        Some(Utf16Modifier::Utf16le | Utf16Modifier::Wide) => STANDARD_NO_PAD.encode(
             input
                 .value_to_string()
                 .encode_utf16()
@@ -19,6 +19,16 @@ pub fn encode_base64(input: &FieldValue, utf16modifier: &Option<Utf16Modifier>) 
                 .flat_map(|x| x.to_be_bytes())
                 .collect::<Vec<u8>>(),
         ),
+        Some(Utf16Modifier::Utf16) => {
+            let mut bytes = vec![0xFF, 0xFE];
+            bytes.extend(
+                input
+                    .value_to_string()
+                    .encode_utf16()
+                    .flat_map(|x| x.to_le_bytes()),
+            );
+            STANDARD_NO_PAD.encode(bytes)
+        }
         None => STANDARD_NO_PAD.encode(input.value_to_string()),
     };
     if encoded.len() % 4 == 2 || encoded.len() % 4 == 3 {
@@ -36,7 +46,7 @@ pub fn encode_base64_offset(
     let mut encoded = vec![];
 
     let char_width = match utf16modifier {
-        Some(Utf16Modifier::Utf16be) | Some(Utf16Modifier::Utf16le) => 2,
+        Some(_) => 2,
         None => 1,
     };
 
@@ -149,6 +159,37 @@ mod tests {
 
         let input = FieldValue::from("");
         assert_eq!(encode_base64(&input, &Some(Utf16Modifier::Utf16be)), "");
+    }
+
+    #[test]
+    fn test_base64_sub_modifiers_docs_example() {
+        // https://github.com/SigmaHQ/sigma-specification/blob/main/appendix/sigma-modifiers-appendix.md#encoding
+
+        let input = FieldValue::from("cmd");
+
+        // utf16le: Transforms value to UTF16-LE encoding, e.g. cmd > 63 00 6d 00 64 00
+        assert_eq!(
+            encode_base64(&input, &Some(Utf16Modifier::Utf16le)),
+            "YwBtAGQA"
+        );
+
+        // utf16be: Transforms value to UTF16-BE encoding, e.g. cmd > 00 63 00 6d 00 64
+        assert_eq!(
+            encode_base64(&input, &Some(Utf16Modifier::Utf16be)),
+            "AGMAbQBk"
+        );
+
+        // utf16: Prepends a byte order mark and encodes UTF16, e.g. cmd > FF FE 63 00 6d 00 64 00
+        assert_eq!(
+            encode_base64(&input, &Some(Utf16Modifier::Utf16)),
+            "//5jAG0AZA"
+        );
+
+        // wide: an alias for the utf16le modifier.
+        assert_eq!(
+            encode_base64(&input, &Some(Utf16Modifier::Wide)),
+            "YwBtAGQA"
+        );
     }
 
     #[test]
