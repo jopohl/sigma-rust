@@ -27,7 +27,7 @@ walkdir = "2.5.0"
 criterion = { version = "0.5", features = ["html_reports"] }
 
 [[bench]]
-name = "my_benchmark"
+name = "matching_benchmark"
 harness = false
 
 [features]
