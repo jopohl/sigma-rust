@@ -84,6 +84,9 @@ pub(crate) fn match_tokenized(tokens: &[WildcardToken], haystack: &str) -> bool 
         let is_last_token = i == tokens.len() - 1;
         match token {
             WildcardToken::QuestionMark => {
+                if pos >= haystack_chars.len() {
+                    return false;
+                }
                 pos += 1;
             }
             WildcardToken::Pattern(p) => {
@@ -102,6 +105,7 @@ pub(crate) fn match_tokenized(tokens: &[WildcardToken], haystack: &str) -> bool 
                             continue 'outer;
                         }
                     }
+                    return false;
                 } else {
                     if !haystack_chars[pos..pos + p.len()].eq(p) {
                         return false;
@@ -109,7 +113,12 @@ pub(crate) fn match_tokenized(tokens: &[WildcardToken], haystack: &str) -> bool 
                     pos += p.len();
                 }
             }
-            WildcardToken::Star => starmode = true,
+            WildcardToken::Star => {
+                if is_last_token {
+                    return true;
+                }
+                starmode = true;
+            }
         }
     }
 
@@ -190,6 +199,8 @@ mod tests {
         );
     }
 
+    // TODO: Reorder those tests
+
     #[test]
     fn test_wildcard_match() {
         assert!(wildcard_match("ab", "ab"));
@@ -204,6 +215,8 @@ mod tests {
         assert!(!wildcard_match("a?c?", "abc"));
         assert!(wildcard_match("ab?", "abc"));
         assert!(!wildcard_match("ab?", "abcd"));
+        assert!(wildcard_match("a*", "a"));
+        assert!(wildcard_match("a*", "acb"));
         assert!(wildcard_match("a*b", "ab"));
         assert!(!wildcard_match("a*?b", "ab"));
         assert!(wildcard_match("a*?b", "acb"));
@@ -212,5 +225,11 @@ mod tests {
         assert!(wildcard_match("foo*bar", "foobarbar"));
         assert!(wildcard_match("foo*bar*fizz", "foobarbarfizzfizz"));
         assert!(!wildcard_match("foo*bar*fizz", "foobarbarfizznope"));
+        assert!(wildcard_match(r"hello\*??world", "hello*myworld"));
+        assert!(wildcard_match(
+            r"C:\\*\\*.exe",
+            r"C:\Windows\System32\calc.exe"
+        ));
+        assert!(!wildcard_match(r"C:\\*\\*.exe", r"C:\test.exe"));
     }
 }
