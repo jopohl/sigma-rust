@@ -7,6 +7,7 @@ mod event;
 mod field;
 mod rule;
 mod selection;
+mod wildcard;
 
 pub use event::Event;
 pub use rule::Rule;

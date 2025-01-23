@@ -15,7 +15,7 @@ pub(crate) fn tokenize(s: &str) -> Vec<WildcardToken> {
 
     let mut escape_mode = false;
 
-    for (i, char) in s.chars().enumerate() {
+    for char in s.chars() {
         match char {
             '*' => {
                 if escape_mode {
@@ -76,41 +76,45 @@ pub(crate) fn tokenize(s: &str) -> Vec<WildcardToken> {
 }
 
 pub(crate) fn match_tokenized(tokens: &[WildcardToken], haystack: &str) -> bool {
-    let mut pos = 0;
-    let haystack_chars: Vec<char> = haystack.chars().collect();
     let mut starmode = false;
+    let mut haystack_iterator = haystack.chars().peekable();
 
     'outer: for (i, token) in tokens.iter().enumerate() {
         let is_last_token = i == tokens.len() - 1;
         match token {
             WildcardToken::QuestionMark => {
-                if pos >= haystack_chars.len() {
+                if haystack_iterator.next().is_none() {
                     return false;
                 }
-                pos += 1;
+            }
+            WildcardToken::Pattern(p) if starmode => {
+                starmode = false;
+                let mut buffer: Vec<char> = vec![];
+
+                while let Some(haystack_char) = haystack_iterator.next() {
+                    buffer.push(haystack_char);
+
+                    if buffer.len() > p.len() {
+                        buffer.remove(0);
+                    }
+
+                    // Loop till a match is found
+                    // If we process the last token, make sure we loop till the end of the haystack
+                    if buffer == *p && (!is_last_token || haystack_iterator.peek().is_none()) {
+                        continue 'outer;
+                    }
+                }
+                return false;
             }
             WildcardToken::Pattern(p) => {
-                if p.len() + pos > haystack_chars.len() {
-                    return false;
-                }
-                if starmode {
-                    starmode = false;
-                    for j in 0..1 + haystack_chars.len() - p.len() - pos {
-                        // Loop till a match is found
-                        // If we process the last token, make sure we loop till the end of the haystack
-                        if haystack_chars[pos + j..pos + j + p.len()].eq(p)
-                            && (!is_last_token || pos + j + p.len() == haystack_chars.len())
-                        {
-                            pos += j + p.len();
-                            continue 'outer;
+                for c in p {
+                    if let Some(haystack_char) = haystack_iterator.next() {
+                        if *c != haystack_char {
+                            return false;
                         }
-                    }
-                    return false;
-                } else {
-                    if !haystack_chars[pos..pos + p.len()].eq(p) {
+                    } else {
                         return false;
                     }
-                    pos += p.len();
                 }
             }
             WildcardToken::Star => {
@@ -122,7 +126,7 @@ pub(crate) fn match_tokenized(tokens: &[WildcardToken], haystack: &str) -> bool 
         }
     }
 
-    pos == haystack_chars.len()
+    haystack_iterator.peek().is_none()
 }
 
 pub(crate) fn wildcard_match(pattern: &str, haystack: &str) -> bool {
@@ -199,8 +203,6 @@ mod tests {
         );
     }
 
-    // TODO: Reorder those tests
-
     #[test]
     fn test_wildcard_match() {
         assert!(wildcard_match("ab", "ab"));
@@ -231,5 +233,177 @@ mod tests {
             r"C:\Windows\System32\calc.exe"
         ));
         assert!(!wildcard_match(r"C:\\*\\*.exe", r"C:\test.exe"));
+    }
+
+    // Additional tests inspired by
+    // https://github.com/cassaundra/wildflower/blob/main/tests/tests.rs
+
+    #[test]
+    fn test_simple_match() {
+        assert!(wildcard_match("", ""));
+        assert!(wildcard_match("a", "a"));
+        assert!(wildcard_match("🔥", "🔥"));
+        assert!(wildcard_match("abc", "abc"));
+
+        assert!(!wildcard_match("a", ""));
+        assert!(!wildcard_match("", "a"));
+        assert!(!wildcard_match("abc", "xyz"));
+        assert!(!wildcard_match("abc", "a"));
+        assert!(!wildcard_match("abc", "ab"));
+        assert!(!wildcard_match("abc", "abx"));
+    }
+
+    #[test]
+    fn test_question_mark() {
+        assert!(wildcard_match("?", "x"));
+        assert!(wildcard_match("??", "xz"));
+        assert!(wildcard_match("??", "🔥🔥"));
+        assert!(wildcard_match("a?", "ab"));
+        assert!(wildcard_match("hel???", "hello🔥"));
+        assert!(wildcard_match("a?aa", "abaa"));
+        assert!(wildcard_match("?a?a?", "baaax"));
+
+        assert!(!wildcard_match("?", ""));
+        assert!(!wildcard_match("?", "ab"));
+        assert!(!wildcard_match("??", "a"));
+        assert!(!wildcard_match("??", "🔥"));
+        assert!(!wildcard_match("x?", "yx"));
+        assert!(!wildcard_match("z?", "z"));
+        assert!(!wildcard_match("abc???", "abcxy"));
+        assert!(!wildcard_match("a?aa", "aaa"));
+        assert!(!wildcard_match("?a?a?", "abcde"));
+    }
+
+    #[test]
+    fn test_single_star() {
+        assert!(wildcard_match("*", ""));
+        assert!(wildcard_match("*", "♡"));
+        assert!(wildcard_match("*", "a"));
+        assert!(wildcard_match("*", "abcdef"));
+    }
+
+    #[test]
+    fn test_multiple_stars() {
+        assert!(wildcard_match("***", ""));
+        assert!(wildcard_match("***", "a"));
+        assert!(wildcard_match("***", "abcdef"));
+    }
+
+    #[test]
+    fn test_leading_star() {
+        assert!(wildcard_match("*a", "a"));
+        assert!(wildcard_match("*fast", "breakfast"));
+
+        assert!(!wildcard_match("*a", "ab"));
+        assert!(!wildcard_match("*fast", "break"));
+    }
+
+    #[test]
+    fn test_trailing_star() {
+        assert!(wildcard_match("a*", "a"));
+        assert!(wildcard_match("break*", "breakfast"));
+        assert!(wildcard_match("break\\**", "break*fast"));
+
+        assert!(!wildcard_match("a*", "ba"));
+        assert!(!wildcard_match("break*", "fast"));
+        assert!(!wildcard_match("break\\**", "breakfast"));
+    }
+
+    #[test]
+    fn test_inner_star() {
+        assert!(wildcard_match("a*b", "ab"));
+        assert!(wildcard_match("a*b", "aXb"));
+        assert!(wildcard_match("a*b", "aXYZb"));
+
+        assert!(!wildcard_match("a*b", "aX"));
+        assert!(!wildcard_match("a*b", "Xb"));
+    }
+
+    #[test]
+    fn test_mixed_stars() {
+        assert!(wildcard_match("*a*b", "ab"));
+        assert!(wildcard_match("*a*b", "Xab"));
+        assert!(wildcard_match("*a*b", "aXb"));
+        assert!(wildcard_match("*a*b", "XaYb"));
+
+        assert!(!wildcard_match("*a*b", "a"));
+        assert!(!wildcard_match("*a*b", "b"));
+
+        assert!(wildcard_match("a*b*", "ab"));
+        assert!(wildcard_match("a*b*", "abX"));
+        assert!(wildcard_match("a*b*", "aXb"));
+        assert!(wildcard_match("a*b*", "aXbY"));
+
+        assert!(!wildcard_match("a*b*", "a"));
+        assert!(!wildcard_match("a*b*", "b"));
+
+        assert!(wildcard_match("*a*b*", "ab"));
+        assert!(wildcard_match("*a*b*", "Xab"));
+        assert!(wildcard_match("*a*b*", "aXb"));
+        assert!(wildcard_match("*a*b*", "XaYb"));
+        assert!(wildcard_match("*a*b*", "abX"));
+        assert!(wildcard_match("*a*b*", "XabY"));
+        assert!(wildcard_match("*a*b*", "XaYbZ"));
+
+        assert!(!wildcard_match("*a*b*", "a"));
+        assert!(!wildcard_match("*a*b*", "b"));
+
+        assert!(wildcard_match("a*X*b", "aXb"));
+        assert!(wildcard_match("a*X*b", "aYXb"));
+        assert!(wildcard_match("a*X*b", "aXYb"));
+        assert!(wildcard_match("a*X*b", "aYXYb"));
+
+        assert!(!wildcard_match("a*X*b", "ab"));
+        assert!(!wildcard_match("a*X*b", "aX"));
+        assert!(!wildcard_match("a*X*b", "Yb"));
+        assert!(!wildcard_match("a*X*b", "aYb"));
+        assert!(!wildcard_match("a*X*b", "aZYZb"));
+    }
+
+    #[test]
+    fn test_mixed_wildcards() {
+        assert!(wildcard_match("?*", "h"));
+        assert!(wildcard_match("?*", "hi!"));
+        assert!(wildcard_match("h?ll*!", "hello world!"));
+        assert!(wildcard_match("h?ll*!", "hollow!"));
+        assert!(wildcard_match("h?ll*!", "hell!"));
+        assert!(wildcard_match("??*", "ab"));
+        assert!(wildcard_match("??*", "abc"));
+        assert!(wildcard_match("??*", "abcd"));
+
+        assert!(!wildcard_match("?*", ""));
+        assert!(!wildcard_match("h?ll*!", "hllo world!"));
+        assert!(!wildcard_match("h?ll*!", "hell"));
+        assert!(!wildcard_match("??*", "a"));
+    }
+
+    #[test]
+    fn test_escapes() {
+        assert!(wildcard_match(r"\\", r"\"));
+        assert!(wildcard_match(r"\\\\", r"\\"));
+        assert!(wildcard_match(r"\?", r"?"));
+        assert!(wildcard_match(r"\*", r"*"));
+        assert!(wildcard_match(r"a\bc", r"a\bc"));
+        assert!(wildcard_match(r"\?\*\a", "?*\\a"));
+        assert!(wildcard_match(r"h?\?", "hi?"));
+        assert!(wildcard_match(r"\??????", "? okay"));
+        assert!(wildcard_match(r"\**", "*.*"));
+    }
+
+    #[test]
+    fn test_whitespace() {
+        assert!(wildcard_match("\n", "\n"));
+        assert!(wildcard_match("?", "\n"));
+        assert!(wildcard_match("\t*\n", "\t\t\n"));
+        assert!(!wildcard_match(" ", "\n"));
+        assert!(!wildcard_match(" ", "\t"));
+    }
+
+    #[test]
+    fn test_extra() {
+        assert!(!wildcard_match("??*?!?", "hello!"));
+        assert!(!wildcard_match("hel*???!?**+", "hello!"));
+        assert!(!wildcard_match("?*??ll*??*w\n", "hello!"));
+        assert!(!wildcard_match("??*``*", r"``\ȣ?"));
     }
 }

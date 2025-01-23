@@ -2,7 +2,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use serde_json::json;
 use sigma_rust::{check_rule, Event, Rule};
 
-fn criterion_benchmark(c: &mut Criterion) {
+fn rule_match_benchmark(c: &mut Criterion) {
     let rule_yaml = r#"
 title: Rule for benchmarking
 logsource:
@@ -58,5 +58,5 @@ detection:
     });
 }
 
-criterion_group!(benches, criterion_benchmark);
+criterion_group!(benches, rule_match_benchmark);
 criterion_main!(benches);
