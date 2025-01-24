@@ -1,6 +1,6 @@
 use crate::basevalue::BaseValue;
 use crate::field::{FieldValue, MatchModifier, Modifier};
-use crate::wildcard::{match_tokenized};
+use crate::wildcard::match_tokenized;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::net::IpAddr;

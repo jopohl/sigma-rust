@@ -1,5 +1,5 @@
 #[derive(Debug, PartialEq)]
-pub(crate) enum WildcardToken {
+pub enum WildcardToken {
     Star,
     QuestionMark,
     Pattern(Vec<char>),
@@ -129,14 +129,14 @@ pub(crate) fn match_tokenized(tokens: &[WildcardToken], haystack: &str) -> bool 
     haystack_iterator.peek().is_none()
 }
 
-pub(crate) fn wildcard_match(pattern: &str, haystack: &str) -> bool {
-    let tokens = tokenize(pattern);
-    match_tokenized(&tokens, haystack)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn wildcard_match(pattern: &str, haystack: &str) -> bool {
+        let tokens = tokenize(pattern);
+        match_tokenized(&tokens, haystack)
+    }
 
     #[test]
     fn test_tokenize() {
