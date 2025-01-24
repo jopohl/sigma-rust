@@ -1,6 +1,10 @@
-use crate::field::FieldValue;
+use crate::basevalue::BaseValue;
+use crate::field::{FieldValue, MatchModifier, Modifier};
+use crate::wildcard::{match_tokenized};
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::net::IpAddr;
+use std::str::FromStr;
 
 #[cfg(feature = "serde_json")]
 #[derive(Debug, serde::Deserialize)]
@@ -11,7 +15,7 @@ struct EventProxy {
 
 #[derive(Debug, PartialEq)]
 pub enum EventValue {
-    Value(FieldValue),
+    Value(BaseValue),
     Sequence(Vec<EventValue>),
     Map(HashMap<String, EventValue>),
 }
@@ -25,7 +29,7 @@ impl TryFrom<serde_json::Value> for EventValue {
             serde_json::Value::Null
             | serde_json::Value::Bool(_)
             | serde_json::Value::Number(_)
-            | serde_json::Value::String(_) => Ok(Self::Value(FieldValue::try_from(value)?)),
+            | serde_json::Value::String(_) => Ok(Self::Value(BaseValue::try_from(value)?)),
             serde_json::Value::Array(a) => {
                 let mut result = Vec::with_capacity(a.len());
                 for item in a {
@@ -52,11 +56,84 @@ impl EventValue {
             Self::Map(m) => m.values().any(|v| v.contains(s)),
         }
     }
+
+    pub(crate) fn matches(&self, field_value: &FieldValue, modifier: &Modifier) -> bool {
+        match (&self, field_value) {
+            (Self::Value(target), FieldValue::Base(value)) => match modifier.match_modifier {
+                // Entered in fieldref case
+                Some(MatchModifier::Contains) => match (target, value) {
+                    (BaseValue::String(target), BaseValue::String(value)) => {
+                        if modifier.cased {
+                            target.contains(value)
+                        } else {
+                            target.to_lowercase().contains(&value.to_lowercase())
+                        }
+                    }
+                    _ => false,
+                },
+                Some(MatchModifier::StartsWith) => match (target, value) {
+                    (BaseValue::String(target), BaseValue::String(value)) => {
+                        if modifier.cased {
+                            target.starts_with(value)
+                        } else {
+                            target.to_lowercase().starts_with(&value.to_lowercase())
+                        }
+                    }
+                    _ => false,
+                },
+                Some(MatchModifier::EndsWith) => match (target, value) {
+                    (BaseValue::String(target), BaseValue::String(value)) => {
+                        if modifier.cased {
+                            target.ends_with(value)
+                        } else {
+                            target.to_lowercase().ends_with(&value.to_lowercase())
+                        }
+                    }
+                    _ => false,
+                },
+
+                Some(MatchModifier::Gt) => target > value,
+                Some(MatchModifier::Gte) => target >= value,
+                Some(MatchModifier::Lt) => target < value,
+                Some(MatchModifier::Lte) => target <= value,
+
+                // Regex and CIDR would already be compiled into FieldValue::Regex and FieldValue::Cidr
+                Some(MatchModifier::Re) | Some(MatchModifier::Cidr) => false,
+
+                // implicit equals
+                None => value == target,
+            },
+            (Self::Value(v), FieldValue::WildcardPattern(w)) => {
+                let mut s = v.value_to_string();
+                if !modifier.cased {
+                    s = s.to_lowercase();
+                }
+                match_tokenized(w, s.as_str())
+            }
+
+            (Self::Value(v), FieldValue::Regex(r)) => r.is_match(&v.value_to_string()),
+            (Self::Value(v), FieldValue::Cidr(c)) => {
+                if let BaseValue::String(s) = v {
+                    match IpAddr::from_str(s) {
+                        Ok(ip) => c.contains(&ip),
+                        Err(_) => false,
+                    }
+                } else {
+                    false
+                }
+            }
+
+            // We currently do not support matching against lists and hashmaps, see
+            // https://github.com/jopohl/sigma-rust/issues/9
+            (Self::Sequence(_), _) => false,
+            (Self::Map(_), _) => false,
+        }
+    }
 }
 
 impl<T> From<T> for EventValue
 where
-    T: Into<FieldValue>,
+    T: Into<BaseValue>,
 {
     fn from(value: T) -> Self {
         Self::Value(value.into())
@@ -179,6 +256,27 @@ impl TryFrom<serde_json::Value> for Event {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn test_matches() {
+        let mut modifier = Modifier::default();
+
+        assert!(EventValue::from("zsh").matches(&FieldValue::from("zsh"), &modifier));
+        assert!(!EventValue::from("zsh").matches(&FieldValue::from("bash"), &modifier));
+
+        modifier.match_modifier = Some(MatchModifier::StartsWith);
+
+        assert!(EventValue::from("zsh").matches(&FieldValue::from("z"), &modifier));
+        assert!(!EventValue::from("zsh").matches(&FieldValue::from("sd"), &modifier));
+
+        modifier.match_modifier = Some(MatchModifier::EndsWith);
+        assert!(EventValue::from("zsh").matches(&FieldValue::from("sh"), &modifier));
+        assert!(!EventValue::from("zsh").matches(&FieldValue::from("sd"), &modifier));
+
+        modifier.match_modifier = Some(MatchModifier::Contains);
+        assert!(EventValue::from("zsh").matches(&FieldValue::from("s"), &modifier));
+        assert!(!EventValue::from("zsh").matches(&FieldValue::from("d"), &modifier));
+    }
 
     #[test]
     fn test_load_from_json() {

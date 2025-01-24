@@ -129,6 +129,7 @@ impl Selection {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::basevalue::BaseValue;
     use crate::event::Event;
     use crate::field::{FieldValue, MatchModifier};
     use serde_yml::Value;
@@ -256,29 +257,29 @@ mod tests {
                 assert_eq!(fields[0].name, "EventID");
                 assert_eq!(fields[0].values.len(), 1);
                 match fields[0].values[0] {
-                    FieldValue::Int(6416) => {}
+                    FieldValue::Base(BaseValue::Int(6416)) => {}
                     _ => panic!("value should be an int"),
                 }
 
                 assert_eq!(fields[1].name, "Float");
                 assert_eq!(fields[1].values.len(), 1);
                 match fields[1].values[0] {
-                    FieldValue::Float(42.21) => {}
+                    FieldValue::Base(BaseValue::Float(42.21)) => {}
                     _ => panic!("value should be a float"),
                 }
 
                 assert_eq!(fields[2].name, "ClassName");
                 assert_eq!(fields[2].values.len(), 1);
                 match fields[2].values[0] {
-                    FieldValue::String(_) => {}
-                    _ => panic!("value should be a string"),
+                    FieldValue::WildcardPattern(_) => {}
+                    _ => panic!("value should be a wildcard pattern"),
                 }
 
                 assert_eq!(fields[3].name, "RandomID");
                 assert_eq!(fields[3].values.len(), 3);
                 match fields[3].values[0] {
-                    FieldValue::String(_) => {}
-                    _ => panic!("value should be a string"),
+                    FieldValue::WildcardPattern(_) => {}
+                    _ => panic!("value should be a wildcard pattern"),
                 }
 
                 match fields[3].modifier.match_modifier {

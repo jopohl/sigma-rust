@@ -42,6 +42,9 @@ pub enum ParserError {
     #[error("Encountered invalid operator '{0}' in condition")]
     InvalidOperator(String),
 
+    #[error("Expected a string for field value but got '{0}'")]
+    NotAString(String),
+
     #[error("Condition references undefined identifiers: '{0:?}'")]
     UndefinedIdentifiers(Vec<String>),
 
@@ -51,7 +54,7 @@ pub enum ParserError {
     #[error("Field names must be string, got: '{0}'")]
     InvalidFieldName(String),
 
-    #[error("The modifiers contains, startswith and endswith must be used with string values, got: '{0}'"
+    #[error("The modifiers contains, startswith and endswith must be used with string values, violated for field: '{0}'"
     )]
     InvalidValueForStringModifier(String),
 }

@@ -206,3 +206,37 @@ fn test_nested_exists() {
     let rule = rule_from_yaml(matching_rule).unwrap();
     assert!(check_rule(&rule, &event));
 }
+
+#[cfg(feature = "serde_json")]
+#[test]
+fn test_wildcard_rule() {
+    let event: Event = json!({
+        "File": "evil.exe",
+        "reference": "test",
+    })
+    .try_into()
+    .unwrap();
+
+    let matching_rule = r#"
+        title: Wildcard
+        logsource:
+        detection:
+            selection:
+                File: "*.exe"
+                reference|endswith: "??t"
+            condition: selection"#;
+
+    let not_matching_rule = r#"
+        title: Wildcard
+        logsource:
+        detection:
+            selection:
+                File: '\*.exe'
+                reference|endswith: "???t"
+            condition: selection"#;
+
+    let rule = rule_from_yaml(matching_rule).unwrap();
+    assert!(check_rule(&rule, &event));
+    let not_matching_rule = rule_from_yaml(not_matching_rule).unwrap();
+    assert!(!check_rule(&not_matching_rule, &event));
+}
