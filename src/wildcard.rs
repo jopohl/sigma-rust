@@ -75,58 +75,68 @@ pub(crate) fn tokenize(s: &str) -> Vec<WildcardToken> {
     result
 }
 
-pub(crate) fn match_tokenized(tokens: &[WildcardToken], haystack: &str) -> bool {
-    let mut starmode = false;
-    let mut haystack_iterator = haystack.chars().peekable();
+macro_rules! match_tokens {
+    ($haystack_iterator:expr, $tokens:expr) => {{
+        let mut starmode = false;
+        let mut haystack_iterator = $haystack_iterator.peekable();
 
-    'outer: for (i, token) in tokens.iter().enumerate() {
-        let is_last_token = i == tokens.len() - 1;
-        match token {
-            WildcardToken::QuestionMark => {
-                if haystack_iterator.next().is_none() {
-                    return false;
-                }
-            }
-            WildcardToken::Pattern(p) if starmode => {
-                starmode = false;
-                let mut buffer: Vec<char> = vec![];
-
-                while let Some(haystack_char) = haystack_iterator.next() {
-                    buffer.push(haystack_char);
-
-                    if buffer.len() > p.len() {
-                        buffer.remove(0);
-                    }
-
-                    // Loop till a match is found
-                    // If we process the last token, make sure we loop till the end of the haystack
-                    if buffer == *p && (!is_last_token || haystack_iterator.peek().is_none()) {
-                        continue 'outer;
-                    }
-                }
-                return false;
-            }
-            WildcardToken::Pattern(p) => {
-                for c in p {
-                    if let Some(haystack_char) = haystack_iterator.next() {
-                        if *c != haystack_char {
-                            return false;
-                        }
-                    } else {
+        'outer: for (i, token) in $tokens.iter().enumerate() {
+            let is_last_token = i == $tokens.len() - 1;
+            match token {
+                WildcardToken::QuestionMark => {
+                    if haystack_iterator.next().is_none() {
                         return false;
                     }
                 }
-            }
-            WildcardToken::Star => {
-                if is_last_token {
-                    return true;
+                WildcardToken::Pattern(p) if starmode => {
+                    starmode = false;
+                    let mut buffer: Vec<char> = vec![];
+
+                    while let Some(haystack_char) = haystack_iterator.next() {
+                        buffer.push(haystack_char);
+
+                        if buffer.len() > p.len() {
+                            buffer.remove(0);
+                        }
+
+                        // Loop till a match is found
+                        // If we process the last token, make sure we loop till the end of the haystack
+                        if buffer == *p && (!is_last_token || haystack_iterator.peek().is_none()) {
+                            continue 'outer;
+                        }
+                    }
+                    return false;
                 }
-                starmode = true;
+                WildcardToken::Pattern(p) => {
+                    for c in p {
+                        if let Some(haystack_char) = haystack_iterator.next() {
+                            if *c != haystack_char {
+                                return false;
+                            }
+                        } else {
+                            return false;
+                        }
+                    }
+                }
+                WildcardToken::Star => {
+                    if is_last_token {
+                        return true;
+                    }
+                    starmode = true;
+                }
             }
         }
-    }
 
-    haystack_iterator.peek().is_none()
+        haystack_iterator.peek().is_none()
+    }};
+}
+
+pub(crate) fn match_tokenized(tokens: &[WildcardToken], haystack: &str, lowercase: bool) -> bool {
+    if lowercase {
+        match_tokens!(haystack.chars().flat_map(|c| c.to_lowercase()), tokens)
+    } else {
+        match_tokens!(haystack.chars(), tokens)
+    }
 }
 
 #[cfg(test)]
@@ -135,7 +145,7 @@ mod tests {
 
     fn wildcard_match(pattern: &str, haystack: &str) -> bool {
         let tokens = tokenize(pattern);
-        match_tokenized(&tokens, haystack)
+        match_tokenized(&tokens, haystack, false)
     }
 
     #[test]

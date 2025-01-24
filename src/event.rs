@@ -104,11 +104,11 @@ impl EventValue {
                 None => value == target,
             },
             (Self::Value(v), FieldValue::WildcardPattern(w)) => {
-                let mut s = v.value_to_string();
-                if !modifier.cased {
-                    s = s.to_lowercase();
+                if let BaseValue::String(s) = v {
+                    match_tokenized(w, s, !modifier.cased)
+                } else {
+                    match_tokenized(w, v.value_to_string().as_str(), !modifier.cased)
                 }
-                match_tokenized(w, s.as_str())
             }
 
             (Self::Value(v), FieldValue::Regex(r)) => r.is_match(&v.value_to_string()),
