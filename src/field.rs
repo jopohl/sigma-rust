@@ -332,6 +332,16 @@ mod tests {
     }
 
     #[test]
+    fn test_evaluate_startswith_cased() {
+        let field = Field::new("test|startswith|cased", vec![FieldValue::from("zsh")]).unwrap();
+        let event = Event::from([("test", "ZSH shutdown")]);
+        assert!(!field.evaluate(&event));
+
+        let event = Event::from([("test", "zsh shutdown")]);
+        assert!(field.evaluate(&event));
+    }
+
+    #[test]
     fn test_evaluate_endswith() {
         let field = Field::new(
             "test|endswith",
@@ -346,6 +356,16 @@ mod tests {
             vec![FieldValue::from("h"), FieldValue::from("sh")],
         )
         .unwrap();
+        assert!(field.evaluate(&event));
+    }
+
+    #[test]
+    fn test_evaluate_endswith_cased() {
+        let field = Field::new("test|endswith|cased", vec![FieldValue::from("down")]).unwrap();
+        let event = Event::from([("test", "ZSH shutdOwn")]);
+        assert!(!field.evaluate(&event));
+
+        let event = Event::from([("test", "zsh shutdown")]);
         assert!(field.evaluate(&event));
     }
 
@@ -365,6 +385,16 @@ mod tests {
         )
         .unwrap();
         assert!(!field.evaluate(&event));
+    }
+
+    #[test]
+    fn test_evaluate_contains_cased() {
+        let field = Field::new("test|contains|cased", vec![FieldValue::from("shut")]).unwrap();
+        let event = Event::from([("test", "ZSH SHUTDOWN")]);
+        assert!(!field.evaluate(&event));
+
+        let event = Event::from([("test", "zsh shutdown")]);
+        assert!(field.evaluate(&event));
     }
 
     #[test]
