@@ -14,7 +14,6 @@ repository = "https://github.com/jopohl/sigma-rust"
 [dependencies]
 base64 = "0.22.1"
 cidr = "0.3.0"
-glob-match = "0.2.1"
 regex = "1.11.0"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_yml = "0.0.12"

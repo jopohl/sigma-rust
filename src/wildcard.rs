@@ -139,14 +139,14 @@ pub(crate) fn match_tokenized(tokens: &[WildcardToken], haystack: &str, lowercas
     }
 }
 
+pub(crate) fn wildcard_match(pattern: &str, haystack: &str) -> bool {
+    let tokens = tokenize(pattern);
+    match_tokenized(&tokens, haystack, false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn wildcard_match(pattern: &str, haystack: &str) -> bool {
-        let tokens = tokenize(pattern);
-        match_tokenized(&tokens, haystack, false)
-    }
 
     #[test]
     fn test_tokenize() {
