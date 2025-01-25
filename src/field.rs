@@ -94,21 +94,20 @@ impl Field {
 
             for val in &self.values {
                 let s = val.as_string()?;
-                match &self.modifier.value_transformer {
-                    Some(Base64(utf16)) => {
+                match self.modifier.value_transformer.as_ref().unwrap() {
+                    Base64(utf16) => {
                         transformed_values.push(FieldValue::from(encode_base64(s.as_str(), utf16)))
                     }
-                    Some(Base64offset(utf16)) => transformed_values.extend(
+                    Base64offset(utf16) => transformed_values.extend(
                         encode_base64_offset(s.as_str(), utf16)
                             .into_iter()
                             .map(FieldValue::from),
                     ),
-                    Some(Windash) => transformed_values.extend(
+                    Windash => transformed_values.extend(
                         windash_variations(s.as_str())
                             .into_iter()
                             .map(FieldValue::from),
                     ),
-                    None => {}
                 }
             }
 
