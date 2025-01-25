@@ -255,6 +255,7 @@ impl TryFrom<serde_json::Value> for Event {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::wildcard::tokenize;
     use serde_json::json;
 
     #[test]
@@ -302,5 +303,23 @@ mod tests {
                 map
             })
         );
+    }
+
+    #[test]
+    fn test_wildcard_matches() {
+        let modifier = Modifier::default();
+        let wildcard = FieldValue::WildcardPattern(tokenize("4?"));
+
+        assert!(EventValue::from("42").matches(&wildcard, &modifier));
+        assert!(EventValue::from(43).matches(&wildcard, &modifier));
+        assert!(EventValue::from(43u32).matches(&wildcard, &modifier));
+        assert!(!EventValue::from(53).matches(&wildcard, &modifier));
+        assert!(!EventValue::from(433).matches(&wildcard, &modifier));
+        assert!(!EventValue::from(None).matches(&wildcard, &modifier));
+
+        let wildcard = FieldValue::WildcardPattern(tokenize("f*"));
+        assert!(EventValue::from(false).matches(&wildcard, &modifier));
+        assert!(!EventValue::from(true).matches(&wildcard, &modifier));
+        assert!(!EventValue::from(None).matches(&wildcard, &modifier));
     }
 }

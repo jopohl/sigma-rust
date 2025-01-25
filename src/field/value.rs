@@ -21,15 +21,6 @@ where
     }
 }
 
-#[cfg(feature = "serde_json")]
-impl TryFrom<serde_json::Value> for FieldValue {
-    type Error = crate::error::JSONError;
-
-    fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
-        Ok(Self::Base(BaseValue::try_from(value)?))
-    }
-}
-
 impl TryFrom<serde_yml::Value> for FieldValue {
     type Error = ParserError;
 

@@ -99,6 +99,25 @@ fn test_match_field_list() {
 }
 
 #[test]
+fn test_match_bool_fields() {
+    let yaml = r#"
+    title: Rule with bool field
+    logsource:
+    detection:
+        selection:
+            flag: true
+        condition: selection
+    "#;
+
+    let rule = rule_from_yaml(yaml).unwrap();
+    let event_1 = Event::from([("flag", true)]);
+    let event_2 = Event::from([("flag", false)]);
+
+    assert!(rule.is_match(&event_1));
+    assert!(!rule.is_match(&event_2));
+}
+
+#[test]
 fn test_match_null_fields() {
     let yaml = r#"
     title: Rule with null field

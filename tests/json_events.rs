@@ -178,6 +178,50 @@ fn test_match_fieldref() {
 
 #[cfg(feature = "serde_json")]
 #[test]
+fn test_match_fieldref_int() {
+    let event: Event = json!({
+        "field": "match",
+        "3": "match",
+    })
+    .try_into()
+    .unwrap();
+
+    let matching_rule = r#"
+        title: Fieldref test
+        logsource:
+        detection:
+            selection:
+                field|fieldref: 3
+            condition: selection"#;
+
+    let rule = rule_from_yaml(matching_rule).unwrap();
+    assert!(check_rule(&rule, &event));
+}
+
+#[cfg(feature = "serde_json")]
+#[test]
+fn test_match_fieldref_float() {
+    let event: Event = json!({
+        "field": "match",
+        "43.44": "match",
+    })
+    .try_into()
+    .unwrap();
+
+    let matching_rule = r#"
+        title: Fieldref test
+        logsource:
+        detection:
+            selection:
+                field|fieldref: 43.44
+            condition: selection"#;
+
+    let rule = rule_from_yaml(matching_rule).unwrap();
+    assert!(check_rule(&rule, &event));
+}
+
+#[cfg(feature = "serde_json")]
+#[test]
 fn test_nested_exists() {
     let event: Event = json!({
         "Image": "testing",

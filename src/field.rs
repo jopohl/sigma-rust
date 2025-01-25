@@ -115,6 +115,7 @@ impl Field {
             self.values = transformed_values;
         }
 
+        let mut order_modifier_provided = false;
         for v in self.values.iter_mut() {
             match self.modifier.match_modifier {
                 Some(MatchModifier::Contains) => {
@@ -162,11 +163,14 @@ impl Field {
                     Ok(re) => *v = FieldValue::Regex(re),
                     Err(err) => return Err(ParserError::RegexParsing(err)),
                 },
-                _ => {}
+                Some(
+                    MatchModifier::Lt | MatchModifier::Lte | MatchModifier::Gt | MatchModifier::Gte,
+                ) => order_modifier_provided = true,
+                None => {}
             }
         }
 
-        if !self.modifier.fieldref {
+        if !self.modifier.fieldref && !order_modifier_provided {
             for v in self.values.iter_mut() {
                 if let FieldValue::Base(BaseValue::String(s)) = v {
                     if self.modifier.cased {
@@ -372,6 +376,20 @@ mod tests {
 
         field.modifier.match_all = true;
         assert!(!field.evaluate(&event));
+    }
+
+    #[test]
+    fn test_evaluate_lt_string() {
+        let field = Field::new("test|lt", vec![FieldValue::from("b")]).unwrap();
+        let event = Event::from([("test", "a")]);
+        assert!(field.evaluate(&event));
+    }
+
+    #[test]
+    fn test_evaluate_gte_null() {
+        let field = Field::new("test|gte", vec![FieldValue::from(None)]).unwrap();
+        let event = Event::from([("test", None)]);
+        assert!(field.evaluate(&event));
     }
 
     #[test]

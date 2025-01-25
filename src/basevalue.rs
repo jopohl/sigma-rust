@@ -110,9 +110,23 @@ impl BaseValue {
             Self::Float(f) => f.to_string(),
             Self::Unsigned(u) => u.to_string(),
             Self::Boolean(b) => b.to_string(),
-            Self::Null => "null".to_string(),
+            Self::Null => "".to_string(),
         }
     }
+}
+
+macro_rules! number {
+    ($n:expr) => {
+        if let Some(i) = $n.as_i64() {
+            Ok(Self::Int(i))
+        } else if let Some(u) = $n.as_u64() {
+            Ok(Self::Unsigned(u))
+        } else {
+            Ok(Self::Float(
+                $n.as_f64().expect("Number is neither Int nor Unsigned"),
+            ))
+        }
+    };
 }
 
 #[cfg(feature = "serde_json")]
@@ -122,20 +136,7 @@ impl TryFrom<serde_json::Value> for BaseValue {
     fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
         match value {
             serde_json::Value::String(s) => Ok(Self::String(s)),
-            serde_json::Value::Number(n) => {
-                if let Some(i) = n.as_i64() {
-                    Ok(Self::Int(i))
-                } else if let Some(u) = n.as_u64() {
-                    Ok(Self::Unsigned(u))
-                } else if let Some(f) = n.as_f64() {
-                    Ok(Self::Float(f))
-                } else {
-                    Err(Self::Error::InvalidFieldValue(format!(
-                        "Number {:?} is neither Int, Float nor Unsigned",
-                        n
-                    )))
-                }
-            }
+            serde_json::Value::Number(n) => number!(n),
             serde_json::Value::Bool(b) => Ok(Self::Boolean(b)),
             serde_json::Value::Null => Ok(Self::Null),
             _ => Err(Self::Error::InvalidFieldValue(format!("{:?}", value))),
@@ -149,20 +150,7 @@ impl TryFrom<serde_yml::Value> for BaseValue {
     fn try_from(value: serde_yml::Value) -> Result<Self, Self::Error> {
         match value {
             serde_yml::Value::Bool(b) => Ok(Self::Boolean(b)),
-            serde_yml::Value::Number(n) => {
-                if let Some(i) = n.as_i64() {
-                    Ok(Self::Int(i))
-                } else if let Some(u) = n.as_u64() {
-                    Ok(Self::Unsigned(u))
-                } else if let Some(f) = n.as_f64() {
-                    Ok(Self::Float(f))
-                } else {
-                    Err(ParserError::InvalidYAML(format!(
-                        "Number {:?} is neither Int, Float nor Unsigned",
-                        n
-                    )))
-                }
-            }
+            serde_yml::Value::Number(n) => number!(n),
             serde_yml::Value::String(s) => Ok(Self::String(s)),
             serde_yml::Value::Null => Ok(Self::Null),
             _ => Err(ParserError::InvalidYAML(format!("{:?}", value))),
@@ -177,8 +165,11 @@ mod tests {
     #[allow(clippy::neg_cmp_op_on_partial_ord)]
     #[test]
     fn test_field_value_type() {
-        assert_eq!(BaseValue::from("1"), BaseValue::from("1"));
-        assert_eq!(BaseValue::from("2"), BaseValue::from("2"));
+        assert_eq!(BaseValue::from("1"), BaseValue::String("1".to_string()));
+        assert_eq!(BaseValue::from("2"), BaseValue::String("2".to_string()));
+        assert_eq!(BaseValue::from(Some(42)), BaseValue::Int(42));
+        assert_eq!(BaseValue::from(2u32), BaseValue::Unsigned(2));
+        assert_eq!(BaseValue::from(3f32), BaseValue::Float(3.0));
         assert_ne!(BaseValue::from("1"), BaseValue::from("3"));
         assert_ne!(BaseValue::from("2"), BaseValue::Int(2_i64));
         assert_ne!(BaseValue::Int(3), BaseValue::Float(3.0));
