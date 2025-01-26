@@ -42,6 +42,37 @@ fn test_match_event_from_json() {
 
 #[cfg(feature = "serde_json")]
 #[test]
+fn test_readme_sample() {
+    let rule_yaml = r#"
+    title: A test rule
+    logsource:
+        category: test
+    detection:
+        selection_1:
+            Event.ID: 42
+            TargetFilename|contains: ':\temp\'
+            TargetFilename|endswith:
+                - '.au3'
+                - '\autoit3.exe'
+        selection_2:
+            Image|contains: ':\temp\'
+            Image|endswith:
+                - '.au3'
+                - '\autoit3.exe'
+        condition: 1 of selection_*
+    "#;
+
+    let rule = rule_from_yaml(rule_yaml).unwrap();
+    let event = event_from_json(
+        r#"{"TargetFilename": "C:\\temp\\file.au3", "Image": "C:\\temp\\autoit4.exe", "Event": {"ID": 42}}"#,
+    )
+        .unwrap();
+
+    assert!(rule.is_match(&event));
+}
+
+#[cfg(feature = "serde_json")]
+#[test]
 fn test_match_multiple_events_from_json() {
     let events_json = r#"
         [
