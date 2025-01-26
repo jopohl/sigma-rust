@@ -485,6 +485,12 @@ mod tests {
     }
 
     #[test]
+    fn test_invalid_regex() {
+        let err = Field::new("test|re", vec![FieldValue::from(r"[")]).unwrap_err();
+        assert!(matches!(err, ParserError::RegexParsing(_)));
+    }
+
+    #[test]
     fn test_cidr() {
         let cidrs = ["10.0.0.0/16", "10.0.0.0/24"];
         let mut field = Field::new(
@@ -502,6 +508,12 @@ mod tests {
         let event = Event::from([("test", "10.1.2.3")]);
         field.modifier.match_all = false;
         assert!(!field.evaluate(&event));
+    }
+
+    #[test]
+    fn test_cidr_invalid_ip() {
+        let err = Field::new("test|cidr", vec![FieldValue::from("1.2.3.4.5.6/16")]).unwrap_err();
+        assert!(matches!(err, IPParsing(_, _)));
     }
 
     #[test]
