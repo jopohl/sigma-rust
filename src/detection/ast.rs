@@ -64,7 +64,9 @@ impl Ast {
                     result.push(WildcardToken::Pattern(buffer.clone()));
                     buffer.clear();
                 }
-                result.push(WildcardToken::Star);
+                if !matches!(result.last(), Some(WildcardToken::Star)) {
+                    result.push(WildcardToken::Star);
+                }
             } else {
                 buffer.push(c);
             }
@@ -178,6 +180,18 @@ mod tests {
         assert_eq!(
             ast.to_string(),
             "(x or (1 of them and all of [Pattern(['y']), Star]))"
+        );
+
+        let ast = Ast::new("x or 1 of them and all of y** ").unwrap();
+        assert_eq!(
+            ast.to_string(),
+            "(x or (1 of them and all of [Pattern(['y']), Star]))"
+        );
+
+        let ast = Ast::new("x or 1 of them and all of y**z ").unwrap();
+        assert_eq!(
+            ast.to_string(),
+            "(x or (1 of them and all of [Pattern(['y']), Star, Pattern(['z'])]))"
         );
     }
 
