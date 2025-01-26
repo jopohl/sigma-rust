@@ -9,7 +9,7 @@ pub enum WildcardToken {
 /// This method also takes care of converting escape sequences (backslashes) into the actual characters
 /// See: https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md#escaping
 /// Therefore, it is crucial to use this method on a raw string provided in the Sigma rule
-pub(crate) fn tokenize(s: &str) -> Vec<WildcardToken> {
+pub(crate) fn tokenize(s: &str, lowercase: bool) -> Vec<WildcardToken> {
     let mut result = vec![];
     let mut buffer: Vec<char> = vec![];
 
@@ -19,7 +19,7 @@ pub(crate) fn tokenize(s: &str) -> Vec<WildcardToken> {
         match char {
             '*' => {
                 if escape_mode {
-                    buffer.push(char);
+                    buffer.push('*');
                     escape_mode = false;
                     continue;
                 }
@@ -36,7 +36,7 @@ pub(crate) fn tokenize(s: &str) -> Vec<WildcardToken> {
             }
             '?' => {
                 if escape_mode {
-                    buffer.push(char);
+                    buffer.push('?');
                     escape_mode = false;
                     continue;
                 }
@@ -52,7 +52,7 @@ pub(crate) fn tokenize(s: &str) -> Vec<WildcardToken> {
                 if !escape_mode {
                     escape_mode = true;
                 } else {
-                    buffer.push(char);
+                    buffer.push('\\');
                     escape_mode = false;
                 }
             }
@@ -61,7 +61,11 @@ pub(crate) fn tokenize(s: &str) -> Vec<WildcardToken> {
                     buffer.push('\\');
                     escape_mode = false;
                 }
-                buffer.push(char)
+                if lowercase {
+                    buffer.extend(char.to_lowercase())
+                } else {
+                    buffer.push(char)
+                }
             }
         }
     }
@@ -140,7 +144,7 @@ pub(crate) fn match_tokenized(tokens: &[WildcardToken], haystack: &str, lowercas
 }
 
 pub(crate) fn wildcard_match(pattern: &str, haystack: &str) -> bool {
-    let tokens = tokenize(pattern);
+    let tokens = tokenize(pattern, false);
     match_tokenized(&tokens, haystack, false)
 }
 
@@ -150,9 +154,9 @@ mod tests {
 
     #[test]
     fn test_tokenize() {
-        assert_eq!(tokenize(""), vec![]);
+        assert_eq!(tokenize("", false), vec![]);
         assert_eq!(
-            tokenize("a*b"),
+            tokenize("a*b", false),
             vec![
                 WildcardToken::Pattern(vec!['a']),
                 WildcardToken::Star,
@@ -160,7 +164,23 @@ mod tests {
             ]
         );
         assert_eq!(
-            tokenize("a?b"),
+            tokenize("A*B", false),
+            vec![
+                WildcardToken::Pattern(vec!['A']),
+                WildcardToken::Star,
+                WildcardToken::Pattern(vec!['B']),
+            ]
+        );
+        assert_eq!(
+            tokenize("A*B", true),
+            vec![
+                WildcardToken::Pattern(vec!['a']),
+                WildcardToken::Star,
+                WildcardToken::Pattern(vec!['b']),
+            ]
+        );
+        assert_eq!(
+            tokenize("a?b", false),
             vec![
                 WildcardToken::Pattern(vec!['a']),
                 WildcardToken::QuestionMark,
@@ -168,42 +188,42 @@ mod tests {
             ]
         );
         assert_eq!(
-            tokenize("a\\*b"),
+            tokenize("a\\*b", false),
             vec![WildcardToken::Pattern(vec!['a', '*', 'b'])]
         );
         assert_eq!(
-            tokenize("a\\?b"),
+            tokenize("a\\?b", false),
             vec![WildcardToken::Pattern(vec!['a', '?', 'b']),]
         );
         assert_eq!(
-            tokenize("a\\b"),
+            tokenize("a\\b", false),
             vec![WildcardToken::Pattern(vec!['a', '\\', 'b']),]
         );
 
         //https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md#escaping
         assert_eq!(
-            tokenize(r"a\b"),
+            tokenize(r"a\b", false),
             vec![WildcardToken::Pattern(vec!['a', '\\', 'b']),]
         );
         assert_eq!(
-            tokenize(r"a\\b"),
+            tokenize(r"a\\b", false),
             vec![WildcardToken::Pattern(vec!['a', '\\', 'b']),]
         );
         assert_eq!(
-            tokenize(r"a\\\b"),
+            tokenize(r"a\\\b", false),
             vec![WildcardToken::Pattern(vec!['a', '\\', '\\', 'b']),]
         );
         assert_eq!(
-            tokenize(r"a\\\*b"),
+            tokenize(r"a\\\*b", false),
             vec![WildcardToken::Pattern(vec!['a', '\\', '*', 'b']),]
         );
         assert_eq!(
-            tokenize(r"a\\\\b"),
+            tokenize(r"a\\\\b", false),
             vec![WildcardToken::Pattern(vec!['a', '\\', '\\', 'b']),]
         );
 
         assert_eq!(
-            tokenize(r"hello***?world"),
+            tokenize(r"hello***?world", false),
             vec![
                 WildcardToken::Pattern("hello".chars().collect()),
                 WildcardToken::Star,

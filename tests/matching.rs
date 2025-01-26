@@ -7,18 +7,21 @@ logsource:
     service: test
 detection:
     keywords:
-        - 'hello world'
-        - 'arch linux'
+        - '* hello world?'
+        - '* arch linux?'
+        - 'evil'
     condition: keywords
 "#;
     let rule: Rule = serde_yml::from_str(yaml).unwrap();
     let event_1 = Event::from([("a", "this is hello world "), ("os", "is windows")]);
-    let event_2 = Event::from([("b", "this is arch linux "), ("more", "something")]);
-    let event_3 = Event::from([("c", "no keyword "), ("d", "no match")]);
+    let event_2 = Event::from([("b", "this is arch linux!"), ("more", "something")]);
+    let event_3 = Event::from([("c", "evil"), ("more", "something")]);
+    let event_4 = Event::from([("d", "no keyword "), ("d", "no match")]);
 
     assert!(rule.is_match(&event_1));
     assert!(rule.is_match(&event_2));
-    assert!(!rule.is_match(&event_3));
+    assert!(rule.is_match(&event_3));
+    assert!(!rule.is_match(&event_4));
 }
 
 #[test]

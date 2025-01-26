@@ -255,26 +255,13 @@ mod tests {
                 assert_eq!(fields[0].name, "field_name");
                 assert_eq!(fields[0].values.len(), 2);
 
-                if let FieldValue::WildcardPattern(pattern) = &fields[0].values[0] {
-                    assert_eq!(pattern.len(), 1);
-                    if let WildcardToken::Pattern(pattern) = &pattern[0] {
-                        assert_eq!(pattern, &"this".chars().collect::<Vec<char>>());
-                    } else {
-                        panic!("Wrong value");
-                    }
-                } else {
-                    panic!("Wrong type");
-                }
-                if let FieldValue::WildcardPattern(pattern) = &fields[0].values[1] {
-                    assert_eq!(pattern.len(), 1);
-                    if let WildcardToken::Pattern(pattern) = &pattern[0] {
-                        assert_eq!(pattern, &"that".chars().collect::<Vec<char>>());
-                    } else {
-                        panic!("Wrong value");
-                    }
-                } else {
-                    panic!("Wrong value");
-                }
+                assert!(
+                    matches!(&fields[0].values[0], FieldValue::WildcardPattern(pattern) if pattern.len() == 1 && matches!(&pattern[0], WildcardToken::Pattern(p) if p == &"this".chars().collect::<Vec<char>>()))
+                );
+
+                assert!(
+                    matches!(&fields[0].values[1], FieldValue::WildcardPattern(pattern) if pattern.len() == 1 && matches!(&pattern[0], WildcardToken::Pattern(p) if p == &"that".chars().collect::<Vec<char>>()))
+                );
             }
         }
 

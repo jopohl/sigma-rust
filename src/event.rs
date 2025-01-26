@@ -1,6 +1,6 @@
 use crate::basevalue::BaseValue;
 use crate::field::{FieldValue, MatchModifier, Modifier};
-use crate::wildcard::match_tokenized;
+use crate::wildcard::{match_tokenized, tokenize};
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::net::IpAddr;
@@ -49,11 +49,16 @@ impl TryFrom<serde_json::Value> for EventValue {
 }
 
 impl EventValue {
-    pub(crate) fn contains(&self, s: &str) -> bool {
+    pub(crate) fn contains_keyword(&self, s: &str) -> bool {
         match self {
-            Self::Value(v) => v.value_to_string().contains(s),
-            Self::Sequence(seq) => seq.iter().any(|v| v.contains(s)),
-            Self::Map(m) => m.values().any(|v| v.contains(s)),
+            Self::Value(v) => {
+                // Case-insensitive matching for keywords
+                //https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md#lists
+                let tokens = tokenize(s, true);
+                match_tokenized(&tokens, v.value_to_string().as_str(), true)
+            }
+            Self::Sequence(seq) => seq.iter().any(|v| v.contains_keyword(s)),
+            Self::Map(m) => m.values().any(|v| v.contains_keyword(s)),
         }
     }
 
@@ -308,7 +313,7 @@ mod tests {
     #[test]
     fn test_wildcard_matches() {
         let modifier = Modifier::default();
-        let wildcard = FieldValue::WildcardPattern(tokenize("4?"));
+        let wildcard = FieldValue::WildcardPattern(tokenize("4?", false));
 
         assert!(EventValue::from("42").matches(&wildcard, &modifier));
         assert!(EventValue::from(43).matches(&wildcard, &modifier));
@@ -317,9 +322,20 @@ mod tests {
         assert!(!EventValue::from(433).matches(&wildcard, &modifier));
         assert!(!EventValue::from(None).matches(&wildcard, &modifier));
 
-        let wildcard = FieldValue::WildcardPattern(tokenize("f*"));
+        let wildcard = FieldValue::WildcardPattern(tokenize("f*", false));
         assert!(EventValue::from(false).matches(&wildcard, &modifier));
         assert!(!EventValue::from(true).matches(&wildcard, &modifier));
         assert!(!EventValue::from(None).matches(&wildcard, &modifier));
+    }
+
+    #[test]
+    fn test_iter() {
+        let event = Event::from([("name", 2)]);
+        let mut event_iter = event.iter();
+        assert_eq!(
+            event_iter.next(),
+            Some((&"name".to_string(), &EventValue::from(2)))
+        );
+        assert_eq!(event_iter.next(), None);
     }
 }

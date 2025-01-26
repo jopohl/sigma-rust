@@ -133,6 +133,59 @@ fn test_match_nested_event() {
 
 #[cfg(feature = "serde_json")]
 #[test]
+fn test_keyword_selection_nested_event() {
+    let event: Event = json!({
+        "Image": "testing",
+        "User": {
+            "Name": {
+                "First": "Chuck",
+                "Last": "Norris",
+            },
+            "Mobile.phone": "1",
+            "Age": 42,
+            "SomeName": "Chuck",
+        },
+        "values": ["test", "linux", "arch"],
+    })
+    .try_into()
+    .unwrap();
+
+    let matching_rule = r#"
+        title: Keywords test element in list
+        logsource:
+        detection:
+            keywords:
+                - linux
+            condition: keywords"#;
+
+    let rule = rule_from_yaml(matching_rule).unwrap();
+    assert!(check_rule(&rule, &event));
+
+    let matching_rule = r#"
+        title: Keywords test element in map
+        logsource:
+        detection:
+            keywords:
+                - 42
+            condition: keywords"#;
+
+    let rule = rule_from_yaml(matching_rule).unwrap();
+    assert!(check_rule(&rule, &event));
+
+    let matching_rule = r#"
+        title: Keywords test wildcard
+        logsource:
+        detection:
+            keywords:
+                - chu*
+            condition: keywords"#;
+
+    let rule = rule_from_yaml(matching_rule).unwrap();
+    assert!(check_rule(&rule, &event));
+}
+
+#[cfg(feature = "serde_json")]
+#[test]
 fn test_match_fieldref() {
     let event: Event = json!({
         "Image": "testing",

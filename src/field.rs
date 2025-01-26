@@ -172,11 +172,7 @@ impl Field {
         if !self.modifier.fieldref && !order_modifier_provided {
             for v in self.values.iter_mut() {
                 if let FieldValue::Base(BaseValue::String(s)) = v {
-                    if self.modifier.cased {
-                        *v = FieldValue::WildcardPattern(tokenize(s));
-                    } else {
-                        *v = FieldValue::WildcardPattern(tokenize(s.to_lowercase().as_str()));
-                    }
+                    *v = FieldValue::WildcardPattern(tokenize(s, !self.modifier.cased));
                 }
             }
         }
@@ -629,5 +625,71 @@ mod tests {
             let err = Field::new("test|exists", values).unwrap_err();
             assert!(matches!(err, ParserError::InvalidValueForExists()));
         }
+    }
+
+    #[test]
+    fn test_match_fieldref_startswith_cased() {
+        let event = Event::from([("value", "abcdefg"), ("reference", "aBcd")]);
+        let field = Field::new(
+            "value|fieldref|startswith",
+            vec![FieldValue::from("reference")],
+        )
+        .unwrap();
+
+        assert!(field.evaluate(&event));
+
+        let field = Field::new(
+            "value|cased|fieldref|startswith",
+            vec![FieldValue::from("reference")],
+        )
+        .unwrap();
+
+        assert!(!field.evaluate(&event));
+        let event = Event::from([("value", "abcdefg"), ("reference", "abcd")]);
+        assert!(field.evaluate(&event));
+    }
+
+    #[test]
+    fn test_match_fieldref_endswith_cased() {
+        let event = Event::from([("value", "abcdefg"), ("reference", "eFg")]);
+        let field = Field::new(
+            "value|fieldref|endswith",
+            vec![FieldValue::from("reference")],
+        )
+        .unwrap();
+
+        assert!(field.evaluate(&event));
+
+        let field = Field::new(
+            "value|cased|fieldref|endswith",
+            vec![FieldValue::from("reference")],
+        )
+        .unwrap();
+
+        assert!(!field.evaluate(&event));
+        let event = Event::from([("value", "abcdefg"), ("reference", "efg")]);
+        assert!(field.evaluate(&event));
+    }
+
+    #[test]
+    fn test_match_fieldref_contains_cased() {
+        let event = Event::from([("value", "abcdefg"), ("reference", "cDe")]);
+        let field = Field::new(
+            "value|fieldref|contains",
+            vec![FieldValue::from("reference")],
+        )
+        .unwrap();
+
+        assert!(field.evaluate(&event));
+
+        let field = Field::new(
+            "value|cased|fieldref|contains",
+            vec![FieldValue::from("reference")],
+        )
+        .unwrap();
+
+        assert!(!field.evaluate(&event));
+        let event = Event::from([("value", "abcdefg"), ("reference", "cde")]);
+        assert!(field.evaluate(&event));
     }
 }

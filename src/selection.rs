@@ -120,7 +120,7 @@ impl Selection {
         match &self {
             Self::Keyword(keywords) => event
                 .values()
-                .any(|v| keywords.iter().any(|kw| v.contains(kw))),
+                .any(|v| keywords.iter().any(|kw| v.contains_keyword(kw))),
             Self::Field(field_groups) => field_groups.iter().any(|g| g.evaluate(event)),
         }
     }
@@ -138,24 +138,27 @@ mod tests {
     fn test_keyword_selection() {
         let selection = Selection::Keyword(vec![
             "test".to_string(),
-            "linux".to_string(),
-            "arch".to_string(),
+            "l?nux".to_string(),
+            "arch *".to_string(),
         ]);
 
-        let event = Event::from([("key", "zsh shutdown test")]);
+        let event = Event::from([("key", "test")]);
         assert!(selection.evaluate(&event));
 
-        let event = Event::from([("nomatch", "zsh shutdown".to_string())]);
+        let event = Event::from([("nomatch", "zsh".to_string())]);
         assert!(!selection.evaluate(&event));
 
-        let event = Event::from([("some", "the arch is on".to_string())]);
+        let event = Event::from([("some", "arch linux".to_string())]);
         assert!(selection.evaluate(&event));
 
-        let event = Event::from([("some", "linux is best".to_string())]);
+        let event = Event::from([("some", "linux".to_string())]);
         assert!(selection.evaluate(&event));
 
-        let event = Event::from([("some", " arch linux ".to_string())]);
+        let event = Event::from([("some", "LINUX".to_string())]);
         assert!(selection.evaluate(&event));
+
+        let event = Event::from([("some", "linus".to_string())]);
+        assert!(!selection.evaluate(&event));
     }
 
     #[test]
