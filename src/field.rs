@@ -11,7 +11,7 @@ use crate::error::ParserError::{IPParsing, InvalidYAML};
 use crate::event::{Event, EventValue};
 use crate::field::transformation::{encode_base64, encode_base64_offset, windash_variations};
 use crate::field::ValueTransformer::{Base64, Base64offset, Windash};
-use crate::wildcard::tokenize;
+use crate::wildcard::{tokenize, WildcardToken};
 use cidr::IpCidr;
 use regex::Regex;
 use serde_yml::Value;
@@ -117,40 +117,12 @@ impl Field {
         let mut order_modifier_provided = false;
         for v in self.values.iter_mut() {
             match self.modifier.match_modifier {
-                Some(MatchModifier::Contains) => {
-                    if self.modifier.fieldref {
-                        continue;
-                    }
-                    if let FieldValue::Base(BaseValue::String(s)) = v {
-                        s.insert(0, '*');
-                        s.push('*');
-                    } else {
+                Some(
+                    MatchModifier::StartsWith | MatchModifier::EndsWith | MatchModifier::Contains,
+                ) => {
+                    if !matches!(v, FieldValue::Base(BaseValue::String(_))) {
                         return Err(ParserError::InvalidValueForStringModifier(
-                            self.name.clone(),
-                        ));
-                    }
-                }
-                Some(MatchModifier::StartsWith) => {
-                    if self.modifier.fieldref {
-                        continue;
-                    }
-                    if let FieldValue::Base(BaseValue::String(s)) = v {
-                        s.push('*');
-                    } else {
-                        return Err(ParserError::InvalidValueForStringModifier(
-                            self.name.clone(),
-                        ));
-                    }
-                }
-                Some(MatchModifier::EndsWith) => {
-                    if self.modifier.fieldref {
-                        continue;
-                    }
-                    if let FieldValue::Base(BaseValue::String(s)) = v {
-                        s.insert(0, '*');
-                    } else {
-                        return Err(ParserError::InvalidValueForStringModifier(
-                            self.name.clone(),
+                            self.name.to_string(),
                         ));
                     }
                 }
@@ -172,7 +144,22 @@ impl Field {
         if !self.modifier.fieldref && !order_modifier_provided {
             for v in self.values.iter_mut() {
                 if let FieldValue::Base(BaseValue::String(s)) = v {
-                    *v = FieldValue::WildcardPattern(tokenize(s, !self.modifier.cased));
+                    let mut tokens = tokenize(s, !self.modifier.cased);
+                    match self.modifier.match_modifier {
+                        Some(MatchModifier::StartsWith) => {
+                            tokens.push(WildcardToken::Star);
+                        }
+                        Some(MatchModifier::EndsWith) => {
+                            tokens.insert(0, WildcardToken::Star);
+                        }
+                        Some(MatchModifier::Contains) => {
+                            tokens.insert(0, WildcardToken::Star);
+                            tokens.push(WildcardToken::Star);
+                        }
+                        _ => {}
+                    }
+
+                    *v = FieldValue::WildcardPattern(tokens);
                 }
             }
         }
