@@ -5,7 +5,7 @@ use crate::detection::ast::Ast;
 use crate::error::ParserError;
 use crate::event::Event;
 use crate::selection::Selection;
-use crate::wildcard::starmatch;
+use crate::wildcard::match_tokenized;
 use serde::Deserialize;
 use serde_yml::Value;
 use std::collections::HashMap;
@@ -121,7 +121,7 @@ impl Detection {
             Ast::OneOf(s) => self
                 .selections
                 .keys()
-                .filter(|name| starmatch(s, name))
+                .filter(|name| match_tokenized(s, name, false))
                 .any(|name| self.evaluate_selection(name, lookup, event)),
             Ast::OneOfThem => self
                 .selections
@@ -130,7 +130,7 @@ impl Detection {
             Ast::AllOf(s) => self
                 .selections
                 .keys()
-                .filter(|name| starmatch(s, name))
+                .filter(|name| match_tokenized(s, name, false))
                 .all(|name| self.evaluate_selection(name, lookup, event)),
             Ast::AllOfThem => self
                 .selections
@@ -242,15 +242,15 @@ mod tests {
     #[test]
     fn test_evaluate_all_of() {
         let detection_yaml = r#"
-    selection_1:
+    selection_1x:
         EventID: 6416
         RandomID|contains:
             - ab
             - cd
             - ed
-    selection_2:
+    selection_2x:
         EventID: 5555
-    condition: all of selection*
+    condition: all of sel*tion*x
 "#;
 
         let mut event = Event::from([("EventID", 6416)]);

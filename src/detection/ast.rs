@@ -1,5 +1,6 @@
 use crate::detection::lexer::{Lexer, Token};
 use crate::error::ParserError;
+use crate::wildcard::WildcardToken;
 use std::collections::HashSet;
 use std::fmt;
 
@@ -32,9 +33,9 @@ impl InfixOperator {
 #[derive(Debug)]
 pub(crate) enum Ast {
     Selection(String),
-    OneOf(String),
+    OneOf(Vec<WildcardToken>),
     OneOfThem,
-    AllOf(String),
+    AllOf(Vec<WildcardToken>),
     AllOfThem,
     Not(Box<Ast>),
     And(Box<Ast>, Box<Ast>),
@@ -53,12 +54,33 @@ impl Ast {
         Self::parse_token_stream(&mut lexer, 0)
     }
 
+    fn tokenize_selection_string(selection: String) -> Vec<WildcardToken> {
+        let mut result: Vec<WildcardToken> = vec![];
+        let mut buffer: Vec<char> = vec![];
+
+        for c in selection.chars() {
+            if c == '*' {
+                if !buffer.is_empty() {
+                    result.push(WildcardToken::Pattern(buffer.clone()));
+                    buffer.clear();
+                }
+                result.push(WildcardToken::Star);
+            } else {
+                buffer.push(c);
+            }
+        }
+        if !buffer.is_empty() {
+            result.push(WildcardToken::Pattern(buffer.clone()));
+        }
+        result
+    }
+
     fn parse_token_stream(lexer: &mut Lexer, min_binding_power: u8) -> Result<Self, ParserError> {
         let mut left = match lexer.next() {
             Token::Selection(s) => Self::Selection(s),
-            Token::OneOf(s) => Self::OneOf(s),
+            Token::OneOf(s) => Self::OneOf(Self::tokenize_selection_string(s)),
             Token::OneOfThem => Self::OneOfThem,
-            Token::AllOf(s) => Self::AllOf(s),
+            Token::AllOf(s) => Self::AllOf(Self::tokenize_selection_string(s)),
             Token::AllOfThem => Self::AllOfThem,
             Token::OpeningParenthesis => {
                 let left = Self::parse_token_stream(lexer, 0)?;
@@ -123,9 +145,9 @@ impl fmt::Display for Ast {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Selection(s) => write!(f, "{}", s),
-            Self::OneOf(s) => write!(f, "1 of {}", s),
+            Self::OneOf(s) => write!(f, "1 of {:?}", s),
             Self::OneOfThem => write!(f, "1 of them"),
-            Self::AllOf(s) => write!(f, "all of {}", s),
+            Self::AllOf(s) => write!(f, "all of {:?}", s),
             Self::AllOfThem => write!(f, "all of them"),
             Self::Not(a) => write!(f, "not ({})", a),
             Self::And(a, b) => write!(f, "({} and {})", a, b),
@@ -153,7 +175,10 @@ mod tests {
     #[test]
     fn test_parse_all() {
         let ast = Ast::new("x or 1 of them and all of y* ").unwrap();
-        assert_eq!(ast.to_string(), "(x or (1 of them and all of y*))");
+        assert_eq!(
+            ast.to_string(),
+            "(x or (1 of them and all of [Pattern(['y']), Star]))"
+        );
     }
 
     #[test]

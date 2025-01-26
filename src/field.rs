@@ -275,6 +275,12 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_error() {
+        let field = Field::new("hello|utf16le", vec![]).unwrap_err();
+        assert!(matches!(field, ParserError::Utf16WithoutBase64));
+    }
+
+    #[test]
     fn test_evaluate_equals() {
         let field = Field::new(
             "test",
@@ -567,12 +573,7 @@ mod tests {
             scrambled_pattern.insert_str(0, "klsenf");
             scrambled_pattern.insert_str(scrambled_pattern.len(), "scvfv");
             let event = Event::from([("test", scrambled_pattern.clone())]);
-            assert!(
-                field.evaluate(&event),
-                "pattern: {} || values: {:?}",
-                scrambled_pattern,
-                field.values
-            );
+            assert!(field.evaluate(&event));
         }
     }
 
@@ -603,6 +604,20 @@ mod tests {
     fn test_invalid_contains() {
         let values: Vec<FieldValue> = vec![FieldValue::from("ok"), FieldValue::from(5)];
         let err = Field::new("test|contains", values).unwrap_err();
+        assert!(matches!(err, ParserError::InvalidValueForStringModifier(name) if name == "test"));
+    }
+
+    #[test]
+    fn test_invalid_startswith() {
+        let values: Vec<FieldValue> = vec![FieldValue::from("ok"), FieldValue::from(5)];
+        let err = Field::new("test|startswith", values).unwrap_err();
+        assert!(matches!(err, ParserError::InvalidValueForStringModifier(name) if name == "test"));
+    }
+
+    #[test]
+    fn test_invalid_endswith() {
+        let values: Vec<FieldValue> = vec![FieldValue::from("ok"), FieldValue::from(5)];
+        let err = Field::new("test|endswith", values).unwrap_err();
         assert!(matches!(err, ParserError::InvalidValueForStringModifier(name) if name == "test"));
     }
 
