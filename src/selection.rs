@@ -120,7 +120,7 @@ impl Selection {
         match &self {
             Self::Keyword(keywords) => event
                 .values()
-                .any(|v| keywords.iter().any(|kw| v.contains(kw))),
+                .any(|v| keywords.iter().any(|kw| v.contains_keyword(kw))),
             Self::Field(field_groups) => field_groups.iter().any(|g| g.evaluate(event)),
         }
     }
@@ -129,6 +129,7 @@ impl Selection {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::basevalue::BaseValue;
     use crate::event::Event;
     use crate::field::{FieldValue, MatchModifier};
     use serde_yml::Value;
@@ -137,24 +138,27 @@ mod tests {
     fn test_keyword_selection() {
         let selection = Selection::Keyword(vec![
             "test".to_string(),
-            "linux".to_string(),
-            "arch".to_string(),
+            "l?nux".to_string(),
+            "arch *".to_string(),
         ]);
 
-        let event = Event::from([("key", "zsh shutdown test")]);
+        let event = Event::from([("key", "test")]);
         assert!(selection.evaluate(&event));
 
-        let event = Event::from([("nomatch", "zsh shutdown".to_string())]);
+        let event = Event::from([("nomatch", "zsh".to_string())]);
         assert!(!selection.evaluate(&event));
 
-        let event = Event::from([("some", "the arch is on".to_string())]);
+        let event = Event::from([("some", "arch linux".to_string())]);
         assert!(selection.evaluate(&event));
 
-        let event = Event::from([("some", "linux is best".to_string())]);
+        let event = Event::from([("some", "linux".to_string())]);
         assert!(selection.evaluate(&event));
 
-        let event = Event::from([("some", " arch linux ".to_string())]);
+        let event = Event::from([("some", "LINUX".to_string())]);
         assert!(selection.evaluate(&event));
+
+        let event = Event::from([("some", "linus".to_string())]);
+        assert!(!selection.evaluate(&event));
     }
 
     #[test]
@@ -183,14 +187,7 @@ mod tests {
         let value = Value::from(keywords.clone());
 
         let selection = Selection::try_from(value).unwrap();
-        match selection {
-            Selection::Keyword(kw) => {
-                assert_eq!(kw.len(), keywords.len())
-            }
-            _ => {
-                panic!("Wrong mode")
-            }
-        }
+        assert!(matches!(selection, Selection::Keyword(kw) if kw.len() == keywords.len()));
     }
 
     #[test]
@@ -202,17 +199,10 @@ mod tests {
     "#;
 
         let value: Value = serde_yml::from_str(yaml).unwrap();
-        match Selection::try_from(value) {
-            Ok(Selection::Keyword(kw)) => {
-                assert_eq!(kw.len(), 3);
-                assert_eq!(kw[0], "0");
-                assert_eq!(kw[1], "6");
-                assert_eq!(kw[2], "hello");
-            }
-            _ => {
-                panic!("Wrong mode")
-            }
-        }
+        let selection = Selection::try_from(value).unwrap();
+        assert!(
+            matches!(selection, Selection::Keyword(kw) if kw.len() == 3 && kw[0] == "0" && kw[1] == "6" && kw[2] == "hello")
+        );
     }
 
     #[test]
@@ -255,36 +245,36 @@ mod tests {
                 let fields = &field_group[0].fields;
                 assert_eq!(fields[0].name, "EventID");
                 assert_eq!(fields[0].values.len(), 1);
-                match fields[0].values[0] {
-                    FieldValue::Int(6416) => {}
-                    _ => panic!("value should be an int"),
-                }
+                assert!(matches!(
+                    fields[0].values[0],
+                    FieldValue::Base(BaseValue::Int(6416))
+                ));
 
                 assert_eq!(fields[1].name, "Float");
                 assert_eq!(fields[1].values.len(), 1);
-                match fields[1].values[0] {
-                    FieldValue::Float(42.21) => {}
-                    _ => panic!("value should be a float"),
-                }
+                assert!(matches!(
+                    fields[1].values[0],
+                    FieldValue::Base(BaseValue::Float(42.21))
+                ));
 
                 assert_eq!(fields[2].name, "ClassName");
                 assert_eq!(fields[2].values.len(), 1);
-                match fields[2].values[0] {
-                    FieldValue::String(_) => {}
-                    _ => panic!("value should be a string"),
-                }
+                assert!(matches!(
+                    fields[2].values[0],
+                    FieldValue::WildcardPattern(_)
+                ));
 
                 assert_eq!(fields[3].name, "RandomID");
                 assert_eq!(fields[3].values.len(), 3);
-                match fields[3].values[0] {
-                    FieldValue::String(_) => {}
-                    _ => panic!("value should be a string"),
-                }
+                assert!(matches!(
+                    fields[3].values[0],
+                    FieldValue::WildcardPattern(_)
+                ));
 
-                match fields[3].modifier.match_modifier {
-                    Some(MatchModifier::Contains) => {}
-                    _ => panic!("wrong modifier"),
-                }
+                assert!(matches!(
+                    fields[3].modifier.match_modifier,
+                    Some(MatchModifier::Contains)
+                ));
             }
             Selection::Keyword(_) => {
                 panic!("wrong mode")

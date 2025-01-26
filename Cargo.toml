@@ -14,7 +14,6 @@ repository = "https://github.com/jopohl/sigma-rust"
 [dependencies]
 base64 = "0.22.1"
 cidr = "0.3.0"
-glob-match = "0.2.1"
 regex = "1.11.0"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_yml = "0.0.12"
@@ -24,7 +23,11 @@ serde_json = { version = "1.0.132", optional = true }
 
 [dev-dependencies]
 walkdir = "2.5.0"
+criterion = { version = "0.5", features = ["html_reports"] }
 
+[[bench]]
+name = "matching_benchmark"
+harness = false
 
 [features]
 default = ["serde_json"]

@@ -180,7 +180,9 @@ impl Rule {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::field::FieldValue;
     use crate::selection::Selection;
+    use crate::wildcard::WildcardToken;
 
     #[test]
     fn test_load_from_yaml() {
@@ -252,8 +254,14 @@ mod tests {
                 assert_eq!(fields.len(), 1);
                 assert_eq!(fields[0].name, "field_name");
                 assert_eq!(fields[0].values.len(), 2);
-                assert_eq!(fields[0].values[0].value_to_string(), "this");
-                assert_eq!(fields[0].values[1].value_to_string(), "that");
+
+                assert!(
+                    matches!(&fields[0].values[0], FieldValue::WildcardPattern(pattern) if pattern.len() == 1 && matches!(&pattern[0], WildcardToken::Pattern(p) if p == &"this".chars().collect::<Vec<char>>()))
+                );
+
+                assert!(
+                    matches!(&fields[0].values[1], FieldValue::WildcardPattern(pattern) if pattern.len() == 1 && matches!(&pattern[0], WildcardToken::Pattern(p) if p == &"that".chars().collect::<Vec<char>>()))
+                );
             }
         }
 

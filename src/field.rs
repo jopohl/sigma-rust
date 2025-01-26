@@ -5,11 +5,13 @@ mod value;
 pub use modifier::*;
 pub use value::*;
 
+use crate::basevalue::BaseValue;
 use crate::error::ParserError;
 use crate::error::ParserError::{IPParsing, InvalidYAML};
 use crate::event::{Event, EventValue};
 use crate::field::transformation::{encode_base64, encode_base64_offset, windash_variations};
 use crate::field::ValueTransformer::{Base64, Base64offset, Windash};
+use crate::wildcard::tokenize;
 use cidr::IpCidr;
 use regex::Regex;
 use serde_yml::Value;
@@ -21,19 +23,6 @@ pub struct Field {
     pub name: String,
     pub values: Vec<FieldValue>,
     pub(crate) modifier: Modifier,
-}
-
-/// Lowercase the given value if it is a string and the cased modifier is not provided
-macro_rules! conditional_lowercase {
-    ($value:expr, $cased:expr) => {
-        if $cased {
-            $value
-        } else if let FieldValue::String(s) = $value {
-            &FieldValue::String(s.to_lowercase())
-        } else {
-            $value
-        }
-    };
 }
 
 impl FromStr for Field {
@@ -93,96 +82,102 @@ impl Field {
             if self.values.len() != 1 {
                 return Err(ParserError::InvalidValueForExists());
             }
-            if let FieldValue::Boolean(b) = self.values[0] {
+            if let FieldValue::Base(BaseValue::Boolean(b)) = self.values[0] {
                 self.modifier.exists = Some(b);
             } else {
                 return Err(ParserError::InvalidValueForExists());
             }
         }
 
-        match self.modifier.match_modifier {
-            Some(MatchModifier::Contains)
-            | Some(MatchModifier::StartsWith)
-            | Some(MatchModifier::EndsWith) => {
-                for v in self.values.iter() {
-                    match v {
-                        FieldValue::String(_) => {}
-                        _ => {
-                            return Err(ParserError::InvalidValueForStringModifier(format!(
-                                "{:?}",
-                                v
-                            )))
-                        }
+        if self.modifier.value_transformer.is_some() {
+            let mut transformed_values: Vec<FieldValue> = Vec::with_capacity(self.values.len());
+
+            for val in &self.values {
+                let s = val.as_string()?;
+                match self.modifier.value_transformer.as_ref().unwrap() {
+                    Base64(utf16) => {
+                        transformed_values.push(FieldValue::from(encode_base64(s.as_str(), utf16)))
                     }
+                    Base64offset(utf16) => transformed_values.extend(
+                        encode_base64_offset(s.as_str(), utf16)
+                            .into_iter()
+                            .map(FieldValue::from),
+                    ),
+                    Windash => transformed_values.extend(
+                        windash_variations(s.as_str())
+                            .into_iter()
+                            .map(FieldValue::from),
+                    ),
                 }
             }
-            Some(MatchModifier::Cidr) => {
-                for i in 0..self.values.len() {
-                    let val_str = self.values[i].value_to_string();
-                    match IpCidr::from_str(val_str.as_str()) {
-                        Ok(ip) => self.values[i] = FieldValue::Cidr(ip),
-                        Err(err) => return Err(IPParsing(val_str, err.to_string())),
-                    }
-                }
-            }
-            Some(MatchModifier::Re) => {
-                for i in 0..self.values.len() {
-                    match Regex::new(self.values[i].value_to_string().as_str()) {
-                        Ok(re) => self.values[i] = FieldValue::Regex(re),
-                        Err(err) => return Err(ParserError::RegexParsing(err)),
-                    }
-                }
-            }
-            _ => {}
+
+            self.values = transformed_values;
         }
 
-        match &self.modifier.value_transformer {
-            Some(Base64(utf16)) => {
-                self.values = self
-                    .values
-                    .iter()
-                    .map(|val| FieldValue::String(encode_base64(val, utf16)))
-                    .collect();
+        let mut order_modifier_provided = false;
+        for v in self.values.iter_mut() {
+            match self.modifier.match_modifier {
+                Some(MatchModifier::Contains) => {
+                    if self.modifier.fieldref {
+                        continue;
+                    }
+                    if let FieldValue::Base(BaseValue::String(s)) = v {
+                        s.insert(0, '*');
+                        s.push('*');
+                    } else {
+                        return Err(ParserError::InvalidValueForStringModifier(
+                            self.name.clone(),
+                        ));
+                    }
+                }
+                Some(MatchModifier::StartsWith) => {
+                    if self.modifier.fieldref {
+                        continue;
+                    }
+                    if let FieldValue::Base(BaseValue::String(s)) = v {
+                        s.push('*');
+                    } else {
+                        return Err(ParserError::InvalidValueForStringModifier(
+                            self.name.clone(),
+                        ));
+                    }
+                }
+                Some(MatchModifier::EndsWith) => {
+                    if self.modifier.fieldref {
+                        continue;
+                    }
+                    if let FieldValue::Base(BaseValue::String(s)) = v {
+                        s.insert(0, '*');
+                    } else {
+                        return Err(ParserError::InvalidValueForStringModifier(
+                            self.name.clone(),
+                        ));
+                    }
+                }
+                Some(MatchModifier::Cidr) => match IpCidr::from_str(v.as_string()?.as_str()) {
+                    Ok(ip) => *v = FieldValue::Cidr(ip),
+                    Err(err) => return Err(IPParsing(v.as_string()?, err.to_string())),
+                },
+                Some(MatchModifier::Re) => match Regex::new(v.as_string()?.as_str()) {
+                    Ok(re) => *v = FieldValue::Regex(re),
+                    Err(err) => return Err(ParserError::RegexParsing(err)),
+                },
+                Some(
+                    MatchModifier::Lt | MatchModifier::Lte | MatchModifier::Gt | MatchModifier::Gte,
+                ) => order_modifier_provided = true,
+                None => {}
             }
-            Some(Base64offset(utf16)) => {
-                self.values = self
-                    .values
-                    .iter()
-                    .flat_map(|val| encode_base64_offset(val, utf16))
-                    .map(FieldValue::String)
-                    .collect();
+        }
+
+        if !self.modifier.fieldref && !order_modifier_provided {
+            for v in self.values.iter_mut() {
+                if let FieldValue::Base(BaseValue::String(s)) = v {
+                    *v = FieldValue::WildcardPattern(tokenize(s, !self.modifier.cased));
+                }
             }
-            Some(Windash) => {
-                self.values = self
-                    .values
-                    .iter()
-                    .flat_map(windash_variations)
-                    .map(FieldValue::String)
-                    .collect();
-            }
-            None => {}
         }
 
         Ok(())
-    }
-
-    pub(crate) fn compare(&self, target: &FieldValue, value: &FieldValue) -> bool {
-        match self.modifier.match_modifier {
-            Some(MatchModifier::Contains) => target.contains(value),
-            Some(MatchModifier::StartsWith) => target.starts_with(value),
-            Some(MatchModifier::EndsWith) => target.ends_with(value),
-
-            Some(MatchModifier::Gt) => target > value,
-            Some(MatchModifier::Gte) => target >= value,
-            Some(MatchModifier::Lt) => target < value,
-            Some(MatchModifier::Lte) => target <= value,
-
-            Some(MatchModifier::Re) => value.is_regex_match(target.value_to_string().as_str()),
-            Some(MatchModifier::Cidr) => value.cidr_contains(target),
-
-            // implicit equals
-            None => value == target,
-        }
     }
 
     pub(crate) fn evaluate(&self, event: &Event) -> bool {
@@ -194,34 +189,26 @@ impl Field {
             return true;
         };
 
-        let EventValue::Value(target) = event_value else {
-            // We currently do not support matching against lists and hashmaps, see
-            // https://github.com/jopohl/sigma-rust/issues/9
-            return false;
-        };
-
-        if self.values.is_empty() {
-            // self.values should never be empty.
-            // But, if it somehow happens we must return true, because
-            //      1. the key exists in the event, and
-            //      2. the field has no further conditions defined
-            return true;
-        }
-
-        let target = conditional_lowercase!(target, self.modifier.cased);
-
         for val in self.values.iter() {
             let cmp = if self.modifier.fieldref {
-                if let Some(EventValue::Value(value)) = event.get(val.value_to_string().as_str()) {
-                    conditional_lowercase!(value, self.modifier.cased)
+                let event_fieldref_value = if let FieldValue::Base(BaseValue::String(s)) = val {
+                    event.get(s)
+                } else if let FieldValue::Base(b) = val {
+                    event.get(b.value_to_string().as_str())
                 } else {
+                    // Should never happen as we do not compile values if fieldref modifier is given
                     continue;
+                };
+
+                match event_fieldref_value {
+                    Some(EventValue::Value(v)) => &FieldValue::Base(v.clone()),
+                    _ => return false,
                 }
             } else {
-                conditional_lowercase!(val, self.modifier.cased)
+                val
             };
 
-            let fired = self.compare(target, cmp);
+            let fired = event_value.matches(cmp, &self.modifier);
             if fired && !self.modifier.match_all {
                 return true;
             } else if !fired && self.modifier.match_all {
@@ -231,7 +218,7 @@ impl Field {
         // After the loop, there are two options:
         // 1. match_all = false: no condition fired  => return false
         // 2. match_all = true: all conditions fired => return true
-        self.modifier.match_all
+        self.modifier.match_all || self.values.is_empty()
     }
 }
 
@@ -288,6 +275,12 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_error() {
+        let field = Field::new("hello|utf16le", vec![]).unwrap_err();
+        assert!(matches!(field, ParserError::Utf16WithoutBase64));
+    }
+
+    #[test]
     fn test_evaluate_equals() {
         let field = Field::new(
             "test",
@@ -332,6 +325,16 @@ mod tests {
     }
 
     #[test]
+    fn test_evaluate_startswith_cased() {
+        let field = Field::new("test|startswith|cased", vec![FieldValue::from("zsh")]).unwrap();
+        let event = Event::from([("test", "ZSH shutdown")]);
+        assert!(!field.evaluate(&event));
+
+        let event = Event::from([("test", "zsh shutdown")]);
+        assert!(field.evaluate(&event));
+    }
+
+    #[test]
     fn test_evaluate_endswith() {
         let field = Field::new(
             "test|endswith",
@@ -346,6 +349,16 @@ mod tests {
             vec![FieldValue::from("h"), FieldValue::from("sh")],
         )
         .unwrap();
+        assert!(field.evaluate(&event));
+    }
+
+    #[test]
+    fn test_evaluate_endswith_cased() {
+        let field = Field::new("test|endswith|cased", vec![FieldValue::from("down")]).unwrap();
+        let event = Event::from([("test", "ZSH shutdOwn")]);
+        assert!(!field.evaluate(&event));
+
+        let event = Event::from([("test", "zsh shutdown")]);
         assert!(field.evaluate(&event));
     }
 
@@ -368,9 +381,19 @@ mod tests {
     }
 
     #[test]
+    fn test_evaluate_contains_cased() {
+        let field = Field::new("test|contains|cased", vec![FieldValue::from("shut")]).unwrap();
+        let event = Event::from([("test", "ZSH SHUTDOWN")]);
+        assert!(!field.evaluate(&event));
+
+        let event = Event::from([("test", "zsh shutdown")]);
+        assert!(field.evaluate(&event));
+    }
+
+    #[test]
     fn test_evaluate_lt() {
         let mut field =
-            Field::new("test|lt", vec![FieldValue::Int(10), FieldValue::Int(15)]).unwrap();
+            Field::new("test|lt", vec![FieldValue::from(10), FieldValue::from(15)]).unwrap();
         let event = Event::from([("test", 10)]);
         assert!(field.evaluate(&event));
 
@@ -379,9 +402,23 @@ mod tests {
     }
 
     #[test]
+    fn test_evaluate_lt_string() {
+        let field = Field::new("test|lt", vec![FieldValue::from("b")]).unwrap();
+        let event = Event::from([("test", "a")]);
+        assert!(field.evaluate(&event));
+    }
+
+    #[test]
+    fn test_evaluate_gte_null() {
+        let field = Field::new("test|gte", vec![FieldValue::from(None)]).unwrap();
+        let event = Event::from([("test", None)]);
+        assert!(field.evaluate(&event));
+    }
+
+    #[test]
     fn test_evaluate_lte() {
         let mut field =
-            Field::new("test|lte", vec![FieldValue::Int(15), FieldValue::Int(20)]).unwrap();
+            Field::new("test|lte", vec![FieldValue::from(15), FieldValue::from(20)]).unwrap();
         let event = Event::from([("test", 15)]);
         assert!(field.evaluate(&event));
 
@@ -391,7 +428,7 @@ mod tests {
 
     #[test]
     fn test_evaluate_gt() {
-        let mut field = Field::new("test|gt", vec![FieldValue::Float(10.1)]).unwrap();
+        let mut field = Field::new("test|gt", vec![FieldValue::from(10.1)]).unwrap();
         let event = Event::from([("test", 10.2)]);
         assert!(field.evaluate(&event));
 
@@ -402,7 +439,7 @@ mod tests {
     #[test]
     fn test_evaluate_gte() {
         let mut field =
-            Field::new("test|gte", vec![FieldValue::Int(15), FieldValue::Int(10)]).unwrap();
+            Field::new("test|gte", vec![FieldValue::from(15), FieldValue::from(10)]).unwrap();
         let event = Event::from([("test", 15)]);
         assert!(field.evaluate(&event));
 
@@ -416,7 +453,7 @@ mod tests {
         assert!(!field.evaluate(&event));
 
         // If we add a float it will work though
-        field.values.push(FieldValue::Float(12.34));
+        field.values.push(FieldValue::from(12.34));
         assert!(field.evaluate(&event));
 
         field.modifier.match_all = true;
@@ -446,24 +483,9 @@ mod tests {
     }
 
     #[test]
-    fn test_compare() {
-        let mut field = Field {
-            name: "test".to_string(),
-            values: vec![],
-            modifier: Modifier::default(),
-        };
-
-        assert!(field.compare(&FieldValue::from("zsh"), &FieldValue::from("zsh")));
-        assert!(!field.compare(&FieldValue::from("zsh"), &FieldValue::from("bash")));
-        field.modifier.match_modifier = Some(MatchModifier::StartsWith);
-        assert!(field.compare(&FieldValue::from("zsh"), &FieldValue::from("z")));
-        assert!(!field.compare(&FieldValue::from("zsh"), &FieldValue::from("sd")));
-        field.modifier.match_modifier = Some(MatchModifier::EndsWith);
-        assert!(field.compare(&FieldValue::from("zsh"), &FieldValue::from("sh")));
-        assert!(!field.compare(&FieldValue::from("zsh"), &FieldValue::from("sd")));
-        field.modifier.match_modifier = Some(MatchModifier::Contains);
-        assert!(field.compare(&FieldValue::from("zsh"), &FieldValue::from("s")));
-        assert!(!field.compare(&FieldValue::from("zsh"), &FieldValue::from("d")));
+    fn test_invalid_regex() {
+        let err = Field::new("test|re", vec![FieldValue::from(r"[")]).unwrap_err();
+        assert!(matches!(err, ParserError::RegexParsing(_)));
     }
 
     #[test]
@@ -484,6 +506,12 @@ mod tests {
         let event = Event::from([("test", "10.1.2.3")]);
         field.modifier.match_all = false;
         assert!(!field.evaluate(&event));
+    }
+
+    #[test]
+    fn test_cidr_invalid_ip() {
+        let err = Field::new("test|cidr", vec![FieldValue::from("1.2.3.4.5.6/16")]).unwrap_err();
+        assert!(matches!(err, IPParsing(_, _)));
     }
 
     #[test]
@@ -545,12 +573,7 @@ mod tests {
             scrambled_pattern.insert_str(0, "klsenf");
             scrambled_pattern.insert_str(scrambled_pattern.len(), "scvfv");
             let event = Event::from([("test", scrambled_pattern.clone())]);
-            assert!(
-                field.evaluate(&event),
-                "pattern: {} || values: {:?}",
-                scrambled_pattern,
-                field.values
-            );
+            assert!(field.evaluate(&event));
         }
     }
 
@@ -579,9 +602,23 @@ mod tests {
 
     #[test]
     fn test_invalid_contains() {
-        let values: Vec<FieldValue> = vec![FieldValue::from("ok"), FieldValue::Int(5)];
+        let values: Vec<FieldValue> = vec![FieldValue::from("ok"), FieldValue::from(5)];
         let err = Field::new("test|contains", values).unwrap_err();
-        assert!(matches!(err, ParserError::InvalidValueForStringModifier(_)));
+        assert!(matches!(err, ParserError::InvalidValueForStringModifier(name) if name == "test"));
+    }
+
+    #[test]
+    fn test_invalid_startswith() {
+        let values: Vec<FieldValue> = vec![FieldValue::from("ok"), FieldValue::from(5)];
+        let err = Field::new("test|startswith", values).unwrap_err();
+        assert!(matches!(err, ParserError::InvalidValueForStringModifier(name) if name == "test"));
+    }
+
+    #[test]
+    fn test_invalid_endswith() {
+        let values: Vec<FieldValue> = vec![FieldValue::from("ok"), FieldValue::from(5)];
+        let err = Field::new("test|endswith", values).unwrap_err();
+        assert!(matches!(err, ParserError::InvalidValueForStringModifier(name) if name == "test"));
     }
 
     #[test]
@@ -599,7 +636,7 @@ mod tests {
     fn test_parse_exists_modifier_invalid_values() {
         let values_vec: Vec<Vec<FieldValue>> = vec![
             vec![FieldValue::from("not a boolean")],
-            vec![FieldValue::from("something"), FieldValue::Float(5.0)],
+            vec![FieldValue::from("something"), FieldValue::from(5.0)],
             vec![FieldValue::from(true), FieldValue::from(true)],
         ];
 
@@ -607,5 +644,71 @@ mod tests {
             let err = Field::new("test|exists", values).unwrap_err();
             assert!(matches!(err, ParserError::InvalidValueForExists()));
         }
+    }
+
+    #[test]
+    fn test_match_fieldref_startswith_cased() {
+        let event = Event::from([("value", "abcdefg"), ("reference", "aBcd")]);
+        let field = Field::new(
+            "value|fieldref|startswith",
+            vec![FieldValue::from("reference")],
+        )
+        .unwrap();
+
+        assert!(field.evaluate(&event));
+
+        let field = Field::new(
+            "value|cased|fieldref|startswith",
+            vec![FieldValue::from("reference")],
+        )
+        .unwrap();
+
+        assert!(!field.evaluate(&event));
+        let event = Event::from([("value", "abcdefg"), ("reference", "abcd")]);
+        assert!(field.evaluate(&event));
+    }
+
+    #[test]
+    fn test_match_fieldref_endswith_cased() {
+        let event = Event::from([("value", "abcdefg"), ("reference", "eFg")]);
+        let field = Field::new(
+            "value|fieldref|endswith",
+            vec![FieldValue::from("reference")],
+        )
+        .unwrap();
+
+        assert!(field.evaluate(&event));
+
+        let field = Field::new(
+            "value|cased|fieldref|endswith",
+            vec![FieldValue::from("reference")],
+        )
+        .unwrap();
+
+        assert!(!field.evaluate(&event));
+        let event = Event::from([("value", "abcdefg"), ("reference", "efg")]);
+        assert!(field.evaluate(&event));
+    }
+
+    #[test]
+    fn test_match_fieldref_contains_cased() {
+        let event = Event::from([("value", "abcdefg"), ("reference", "cDe")]);
+        let field = Field::new(
+            "value|fieldref|contains",
+            vec![FieldValue::from("reference")],
+        )
+        .unwrap();
+
+        assert!(field.evaluate(&event));
+
+        let field = Field::new(
+            "value|cased|fieldref|contains",
+            vec![FieldValue::from("reference")],
+        )
+        .unwrap();
+
+        assert!(!field.evaluate(&event));
+        let event = Event::from([("value", "abcdefg"), ("reference", "cde")]);
+        assert!(field.evaluate(&event));
     }
 }

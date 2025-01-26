@@ -133,6 +133,59 @@ fn test_match_nested_event() {
 
 #[cfg(feature = "serde_json")]
 #[test]
+fn test_keyword_selection_nested_event() {
+    let event: Event = json!({
+        "Image": "testing",
+        "User": {
+            "Name": {
+                "First": "Chuck",
+                "Last": "Norris",
+            },
+            "Mobile.phone": "1",
+            "Age": 42,
+            "SomeName": "Chuck",
+        },
+        "values": ["test", "linux", "arch"],
+    })
+    .try_into()
+    .unwrap();
+
+    let matching_rule = r#"
+        title: Keywords test element in list
+        logsource:
+        detection:
+            keywords:
+                - linux
+            condition: keywords"#;
+
+    let rule = rule_from_yaml(matching_rule).unwrap();
+    assert!(check_rule(&rule, &event));
+
+    let matching_rule = r#"
+        title: Keywords test element in map
+        logsource:
+        detection:
+            keywords:
+                - 42
+            condition: keywords"#;
+
+    let rule = rule_from_yaml(matching_rule).unwrap();
+    assert!(check_rule(&rule, &event));
+
+    let matching_rule = r#"
+        title: Keywords test wildcard
+        logsource:
+        detection:
+            keywords:
+                - chu*
+            condition: keywords"#;
+
+    let rule = rule_from_yaml(matching_rule).unwrap();
+    assert!(check_rule(&rule, &event));
+}
+
+#[cfg(feature = "serde_json")]
+#[test]
 fn test_match_fieldref() {
     let event: Event = json!({
         "Image": "testing",
@@ -178,6 +231,50 @@ fn test_match_fieldref() {
 
 #[cfg(feature = "serde_json")]
 #[test]
+fn test_match_fieldref_int() {
+    let event: Event = json!({
+        "field": "match",
+        "3": "match",
+    })
+    .try_into()
+    .unwrap();
+
+    let matching_rule = r#"
+        title: Fieldref test
+        logsource:
+        detection:
+            selection:
+                field|fieldref: 3
+            condition: selection"#;
+
+    let rule = rule_from_yaml(matching_rule).unwrap();
+    assert!(check_rule(&rule, &event));
+}
+
+#[cfg(feature = "serde_json")]
+#[test]
+fn test_match_fieldref_float() {
+    let event: Event = json!({
+        "field": "match",
+        "43.44": "match",
+    })
+    .try_into()
+    .unwrap();
+
+    let matching_rule = r#"
+        title: Fieldref test
+        logsource:
+        detection:
+            selection:
+                field|fieldref: 43.44
+            condition: selection"#;
+
+    let rule = rule_from_yaml(matching_rule).unwrap();
+    assert!(check_rule(&rule, &event));
+}
+
+#[cfg(feature = "serde_json")]
+#[test]
 fn test_nested_exists() {
     let event: Event = json!({
         "Image": "testing",
@@ -205,4 +302,38 @@ fn test_nested_exists() {
 
     let rule = rule_from_yaml(matching_rule).unwrap();
     assert!(check_rule(&rule, &event));
+}
+
+#[cfg(feature = "serde_json")]
+#[test]
+fn test_wildcard_rule() {
+    let event: Event = json!({
+        "File": "evil.exe",
+        "reference": "test",
+    })
+    .try_into()
+    .unwrap();
+
+    let matching_rule = r#"
+        title: Wildcard
+        logsource:
+        detection:
+            selection:
+                File: "*.exe"
+                reference|endswith: "??t"
+            condition: selection"#;
+
+    let not_matching_rule = r#"
+        title: Wildcard
+        logsource:
+        detection:
+            selection:
+                File: '\*.exe'
+                reference|endswith: "???t"
+            condition: selection"#;
+
+    let rule = rule_from_yaml(matching_rule).unwrap();
+    assert!(check_rule(&rule, &event));
+    let not_matching_rule = rule_from_yaml(not_matching_rule).unwrap();
+    assert!(!check_rule(&not_matching_rule, &event));
 }
