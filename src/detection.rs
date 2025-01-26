@@ -5,7 +5,7 @@ use crate::detection::ast::Ast;
 use crate::error::ParserError;
 use crate::event::Event;
 use crate::selection::Selection;
-use crate::wildcard::wildcard_match;
+use crate::wildcard::starmatch;
 use serde::Deserialize;
 use serde_yml::Value;
 use std::collections::HashMap;
@@ -121,7 +121,7 @@ impl Detection {
             Ast::OneOf(s) => self
                 .selections
                 .keys()
-                .filter(|name| wildcard_match(s, name))
+                .filter(|name| starmatch(s, name))
                 .any(|name| self.evaluate_selection(name, lookup, event)),
             Ast::OneOfThem => self
                 .selections
@@ -130,7 +130,7 @@ impl Detection {
             Ast::AllOf(s) => self
                 .selections
                 .keys()
-                .filter(|name| wildcard_match(s, name))
+                .filter(|name| starmatch(s, name))
                 .all(|name| self.evaluate_selection(name, lookup, event)),
             Ast::AllOfThem => self
                 .selections

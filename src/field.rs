@@ -189,14 +189,6 @@ impl Field {
             return true;
         };
 
-        if self.values.is_empty() {
-            // self.values should never be empty.
-            // But, if it somehow happens we must return true, because
-            //      1. the key exists in the event, and
-            //      2. the field has no further conditions defined
-            return true;
-        }
-
         for val in self.values.iter() {
             let cmp = if self.modifier.fieldref {
                 let event_fieldref_value = if let FieldValue::Base(BaseValue::String(s)) = val {
@@ -226,7 +218,7 @@ impl Field {
         // After the loop, there are two options:
         // 1. match_all = false: no condition fired  => return false
         // 2. match_all = true: all conditions fired => return true
-        self.modifier.match_all
+        self.modifier.match_all || self.values.is_empty()
     }
 }
 

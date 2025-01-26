@@ -143,14 +143,36 @@ pub(crate) fn match_tokenized(tokens: &[WildcardToken], haystack: &str, lowercas
     }
 }
 
-pub(crate) fn wildcard_match(pattern: &str, haystack: &str) -> bool {
-    let tokens = tokenize(pattern, false);
+// Function that only evaluates the star token, used for the detection wildcard matching for example selection*
+pub(crate) fn starmatch(pattern: &str, haystack: &str) -> bool {
+    let mut tokens: Vec<WildcardToken> = vec![];
+    let mut buffer: Vec<char> = vec![];
+    for c in pattern.chars() {
+        if c == '*' {
+            if !buffer.is_empty() {
+                tokens.push(WildcardToken::Pattern(buffer.clone()));
+                buffer.clear();
+            }
+            tokens.push(WildcardToken::Star);
+        } else {
+            buffer.push(c);
+        }
+    }
+    if !buffer.is_empty() {
+        tokens.push(WildcardToken::Pattern(buffer));
+    }
+
     match_tokenized(&tokens, haystack, false)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    pub(crate) fn wildcard_match(pattern: &str, haystack: &str) -> bool {
+        let tokens = tokenize(pattern, false);
+        match_tokenized(&tokens, haystack, false)
+    }
 
     #[test]
     fn test_tokenize() {
