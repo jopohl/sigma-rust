@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 #[derive(Debug, PartialEq)]
 pub enum WildcardToken {
     Star,
@@ -96,19 +94,17 @@ fn match_tokens(haystack_iterator: impl Iterator<Item = char>, tokens: &[Wildcar
             WildcardToken::Pattern(p) if starmode => {
                 starmode = false;
                 let p_len = p.len();
-                let mut window = VecDeque::with_capacity(p_len);
+                let mut buffer = Vec::with_capacity(p_len);
 
                 while let Some(haystack_char) = haystack_iterator.next() {
-                    if window.len() == p_len {
-                        window.pop_front();
+                    if buffer.len() == p_len {
+                        buffer.remove(0);
                     }
-                    window.push_back(haystack_char);
+                    buffer.push(haystack_char);
 
                     // Loop till a match is found
                     // If we process the last token, make sure we loop till the end of the haystack
-                    if window.iter().eq(p.iter())
-                        && (!is_last_token || haystack_iterator.peek().is_none())
-                    {
+                    if buffer == *p && (!is_last_token || haystack_iterator.peek().is_none()) {
                         continue 'outer;
                     }
                 }
@@ -143,6 +139,7 @@ pub(crate) fn match_tokenized(tokens: &[WildcardToken], haystack: &str, lowercas
         match_tokens(haystack.chars(), tokens)
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
