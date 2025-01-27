@@ -93,11 +93,10 @@ fn match_tokens(haystack_iterator: impl Iterator<Item = char>, tokens: &[Wildcar
             }
             WildcardToken::Pattern(p) if starmode => {
                 starmode = false;
-                let p_len = p.len();
-                let mut buffer = Vec::with_capacity(p_len);
+                let mut buffer = Vec::with_capacity(p.len());
 
                 while let Some(haystack_char) = haystack_iterator.next() {
-                    if buffer.len() == p_len {
+                    if buffer.len() == p.len() {
                         buffer.remove(0);
                     }
                     buffer.push(haystack_char);
