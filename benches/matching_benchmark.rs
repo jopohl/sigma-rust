@@ -8,10 +8,10 @@ title: Rule for benchmarking
 logsource:
 detection:
     selection_filename_suffix:
-        TargetFilename: ':\temp\'
-        TargetFilename|endswith: .exe
+        TargetFilename: '*\temp\'
+        TargetFilename|endswith: .e?e
     selection_image_suffix:
-        Image: ':\temp\'
+        Image: ':\t?mp\'
     condition: all of them
         "#;
 
