@@ -49,6 +49,37 @@ impl TryFrom<serde_json::Value> for EventValue {
 }
 
 impl EventValue {
+    /// Returns the string representation of an EventValue
+    pub fn value_to_string(&self) -> String {
+        match self {
+            Self::Value(v) => v.value_to_string(),
+            Self::Sequence(v) => {
+                let mut result = "[".to_string();
+                result.push_str(
+                    v.iter()
+                        .map(|v| v.value_to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                        .as_str(),
+                );
+                result.push(']');
+                result
+            }
+            Self::Map(m) => {
+                let mut result = "{".to_string();
+                result.push_str(
+                    m.iter()
+                        .map(|(k, v)| format!("{}: {}", k, v.value_to_string()))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                        .as_str(),
+                );
+                result.push('}');
+                result
+            }
+        }
+    }
+
     pub(crate) fn contains_keyword(&self, s: &str) -> bool {
         match self {
             Self::Value(v) => {
@@ -262,6 +293,34 @@ mod tests {
     use super::*;
     use crate::wildcard::tokenize;
     use serde_json::json;
+
+    #[test]
+    fn test_event_value_to_string() {
+        let event_value = EventValue::Value(BaseValue::String("test".to_string()));
+        assert_eq!(event_value.value_to_string(), "test");
+
+        let event_value = EventValue::Sequence(vec![
+            EventValue::Value(BaseValue::String("test".to_string())),
+            EventValue::Value(BaseValue::Int(42)),
+        ]);
+
+        assert_eq!(event_value.value_to_string(), "[test, 42]");
+
+        let event_value = EventValue::Map({
+            let mut map = HashMap::new();
+            map.insert(
+                "key".to_string(),
+                EventValue::Value(BaseValue::String("test".to_string())),
+            );
+            map.insert("number".to_string(), EventValue::Value(BaseValue::Int(42)));
+            map
+        });
+
+        assert!(
+            event_value.value_to_string() == "{key: test, number: 42}"
+                || event_value.value_to_string() == "{number: 42, key: test}"
+        );
+    }
 
     #[test]
     fn test_matches() {
