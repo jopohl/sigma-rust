@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Declares the status of the rule
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Copy, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Status {
     /// the rule is considered as stable and may be used in production systems or dashboards.
@@ -36,7 +36,7 @@ pub struct Related {
 }
 
 /// The related type describes the relationship between the rule and the referred rule.
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Copy, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum RelatedType {
     /// The rule was derived from the referred rule or rules, which may remain active.
@@ -73,7 +73,7 @@ pub struct Logsource {
 /// The level describes the criticality of a triggered rule.
 /// While low and medium level events have an informative character,
 /// events with high and critical level should lead to immediate reviews by security analysts.
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Copy, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Level {
     /// Rule is intended for enrichment of events, e.g. by tagging them. No case or alerting should be triggered by such rules because it is expected that a huge amount of events will match these rules.
