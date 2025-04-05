@@ -11,7 +11,7 @@ mod selection;
 mod wildcard;
 
 pub use event::Event;
-pub use rule::Rule;
+pub use rule::{Rule, Status};
 
 /// Parse a rule from a YAML string
 pub fn rule_from_yaml(yaml: &str) -> Result<Rule, serde_yml::Error> {
