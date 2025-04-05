@@ -73,7 +73,7 @@ pub struct Logsource {
 /// The level describes the criticality of a triggered rule.
 /// While low and medium level events have an informative character,
 /// events with high and critical level should lead to immediate reviews by security analysts.
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Level {
     /// Rule is intended for enrichment of events, e.g. by tagging them. No case or alerting should be triggered by such rules because it is expected that a huge amount of events will match these rules.
