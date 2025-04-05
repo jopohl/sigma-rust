@@ -1,10 +1,10 @@
 use crate::detection::Detection;
 use crate::event::Event;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Declares the status of the rule
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Status {
     /// the rule is considered as stable and may be used in production systems or dashboards.
