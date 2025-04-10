@@ -10,7 +10,7 @@ use crate::error::ParserError;
 use crate::error::ParserError::{IPParsing, InvalidYAML};
 use crate::event::{Event, EventValue};
 use crate::field::transformation::{encode_base64, encode_base64_offset, windash_variations};
-use crate::field::ValueTransformer::{Base64, Base64offset, Windash};
+use crate::field::ValueTransformer::{Base64, Base64offset, Len, Windash};
 use crate::wildcard::{tokenize, WildcardToken};
 use cidr::IpCidr;
 use regex::Regex;
@@ -108,6 +108,9 @@ impl Field {
                             .into_iter()
                             .map(FieldValue::from),
                     ),
+                    Len => {
+                        todo!()
+                    }
                 }
             }
 

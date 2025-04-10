@@ -1,3 +1,4 @@
+use crate::event::EventValue;
 use crate::field::Utf16Modifier;
 use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
@@ -98,6 +99,14 @@ pub fn windash_variations(input: &str) -> Vec<String> {
     }
 
     result
+}
+
+pub fn length(value: &EventValue) -> i64 {
+    match value {
+        EventValue::Sequence(seq) => seq.len() as i64,
+        EventValue::Map(map) => map.len() as i64,
+        _ => 0,
+    }
 }
 
 #[cfg(test)]
