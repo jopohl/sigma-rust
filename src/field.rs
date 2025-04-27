@@ -176,7 +176,10 @@ impl Field {
             return true;
         };
 
-        for val in self.values.iter() {
+        let require_all = self.modifier.match_all || matches!(self.modifier.collection, Some(CollectionMatch::All));
+        let mut require_any_fired = false;
+
+        for val in &self.values {
             let cmp = if self.modifier.fieldref {
                 let event_fieldref_value = if let FieldValue::Base(BaseValue::String(s)) = val {
                     event.get(s)
@@ -195,17 +198,24 @@ impl Field {
                 val
             };
 
-            let fired = event_value.matches(cmp, &self.modifier);
-            if fired && !self.modifier.match_all {
-                return true;
-            } else if !fired && self.modifier.match_all {
+            let fired = match event_value {
+                EventValue::Sequence(seq) => {
+                    seq.iter().any(|item| item.matches(cmp, &self.modifier))
+                }
+                _ => event_value.matches(cmp, &self.modifier),
+            };
+
+            if fired {
+                require_any_fired = true;
+                if !require_all {
+                    return true;
+                }
+            } else if require_all {
                 return false;
             }
         }
-        // After the loop, there are two options:
-        // 1. match_all = false: no condition fired  => return false
-        // 2. match_all = true: all conditions fired => return true
-        self.modifier.match_all || self.values.is_empty()
+
+        require_all && require_any_fired
     }
 }
 

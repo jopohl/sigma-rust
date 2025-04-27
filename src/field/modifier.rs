@@ -17,6 +17,15 @@ pub enum MatchModifier {
     Cidr,
 }
 
+impl MatchModifier {
+    pub(crate) fn is_string_match(&self) -> bool {
+        matches!(
+            self,
+            MatchModifier::Contains | MatchModifier::StartsWith | MatchModifier::EndsWith
+        )
+    }
+}
+
 #[derive(Debug, PartialEq, Display)]
 pub enum Utf16Modifier {
     Utf16le,
@@ -33,9 +42,17 @@ pub enum ValueTransformer {
     Windash,
 }
 
+#[derive(Debug, PartialEq, Display, EnumString)]
+#[strum(serialize_all = "lowercase")]
+pub enum CollectionMatch {
+    Any,
+    All,
+}
+
 #[derive(Debug, Default, PartialEq)]
 pub struct Modifier {
     pub(crate) match_all: bool,
+    pub(crate) collection: Option<CollectionMatch>,
     pub(crate) fieldref: bool,
     pub(crate) cased: bool,
     pub(crate) exists: Option<bool>,
@@ -65,23 +82,31 @@ impl FromStr for Modifier {
         let mut result = Self::default();
 
         for s in string.split("|").skip(1).map(|s| s.to_lowercase()) {
-            if s == "all" {
-                result.match_all = true;
-                continue;
-            }
-            if s == "fieldref" {
-                result.fieldref = true;
-                continue;
-            }
-            if s == "cased" {
-                result.cased = true;
-                continue;
-            }
-            if s == "exists" {
-                // The real value of the exists modifier will be set during field parsing
-                // because it is the field value and here we only parse the field name.
-                result.exists = Some(bool::default());
-                continue;
+            match s.as_str() {
+                "all" => {
+                    result.match_all = true;
+                    result.collection = Some(CollectionMatch::All);
+                    continue;
+                }
+                "any" => {
+                    result.collection = Some(CollectionMatch::Any);
+                    continue;
+                }
+                "fieldref" => {
+                    result.fieldref = true;
+                    continue;
+                }
+                "cased" => {
+                    result.cased = true;
+                    continue;
+                }
+                "exists" => {
+                    // The real value of the exists modifier will be set during field parsing
+                    // because it is the field value and here we only parse the field name.
+                    result.exists = Some(bool::default());
+                    continue;
+                }
+                _ => {}
             }
 
             if let Ok(match_modifier) = MatchModifier::from_str(&s) {
@@ -232,5 +257,12 @@ mod test {
     fn test_conflicting_exists_modifier() {
         let err = Modifier::from_str("fieldname|all|exists").unwrap_err();
         assert!(matches!(err, ParserError::ExistsNotStandalone()));
+    }
+
+    #[test]
+    fn test_contains_any_parses() {
+        let m = Modifier::from_str("field|contains|any").unwrap();
+        assert_eq!(m.match_modifier, Some(MatchModifier::Contains));
+        assert_eq!(m.collection, Some(CollectionMatch::Any));
     }
 }

@@ -1,12 +1,17 @@
 use sigma_rust::rule_from_yaml;
 use std::fs::File;
 use std::io::Read;
+use std::path::Path;
 use std::time::Instant;
 use walkdir::WalkDir;
 
 #[test]
 fn test_parse_sigma_main_rules() {
     let sigma_dir = "sigma-main-rules";
+    if !Path::new(sigma_dir).exists() {
+        eprintln!("Skipping test_parse_sigma_main_rules: '{}' directory not found", sigma_dir);
+        return;
+    }
     let mut num_successful = 0;
     let mut num_failed = 0;
     let mut total = 0;
