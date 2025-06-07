@@ -35,32 +35,11 @@ pub struct CorrelationCondition {
 
 impl CorrelationCondition {
     pub fn matches(&self, value: u64) -> bool {
-        if let Some(gte) = self.gte {
-            if value < gte {
-                return false;
-            }
-        }
-        if let Some(lte) = self.lte {
-            if value > lte {
-                return false;
-            }
-        }
-        if let Some(eq) = self.eq {
-            if value != eq {
-                return false;
-            }
-        }
-        if let Some(gt) = self.gt {
-            if value <= gt {
-                return false;
-            }
-        }
-        if let Some(lt) = self.lt {
-            if value >= lt {
-                return false;
-            }
-        }
-        true
+        self.gte.map_or(true, |gte| value >= gte)
+            && self.lte.map_or(true, |lte| value <= lte)
+            && self.eq.map_or(true, |eq| value == eq)
+            && self.gt.map_or(true, |gt| value > gt)
+            && self.lt.map_or(true, |lt| value < lt)
     }
 }
 
@@ -142,6 +121,7 @@ pub struct CorrelationEngine {
     pub base_rules: HashMap<String, Rule>,
 }
 
+/// Result type for parsing rules from YAML
 pub type ParseRulesResult = Result<(Vec<SigmaCorrelationRule>, Vec<(String, Rule)>)>;
 
 impl Default for CorrelationEngine {
