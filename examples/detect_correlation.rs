@@ -103,26 +103,26 @@ fn find_matching_events(events: &[Event], engine: &CorrelationEngine) -> Vec<Tim
     events
         .iter()
         .flat_map(|event| {
-            // For each event, check against all rules
-            engine.base_rules.values().filter_map(move |rule| {
-                if !rule.is_match(event) {
-                    return None;
-                }
-                // Extract timestamp from event
-                let timestamp = event.get("Timestamp").and_then(|ts| {
-                    let ts_str = ts.value_to_string();
-                    DateTime::parse_from_rfc3339(&ts_str)
-                        .ok()
-                        .map(|dt| dt.with_timezone(&Utc))
-                })?;
+            engine
+                .base_rules
+                .values()
+                .filter(|rule| rule.is_match(event))
+                .filter_map(|rule| {
+                    // Extract timestamp from event
+                    let timestamp = event.get("Timestamp").and_then(|ts| {
+                        let ts_str = ts.value_to_string();
+                        DateTime::parse_from_rfc3339(&ts_str)
+                            .ok()
+                            .map(|dt| dt.with_timezone(&Utc))
+                    })?;
 
-                // Create timestamped event with rule context
-                Some(TimestampedEvent {
-                    event: event.clone(),
-                    timestamp,
-                    rule_name: rule.name.clone()?,
+                    // Create timestamped event with rule context
+                    Some(TimestampedEvent {
+                        event: event.clone(),
+                        timestamp,
+                        rule_name: rule.name.clone()?,
+                    })
                 })
-            })
         })
         .collect()
 }
