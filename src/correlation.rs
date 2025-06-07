@@ -467,7 +467,6 @@ pub fn parse_rules_from_yaml(yaml: &str) -> ParseRulesResult {
         if doc.is_empty() {
             continue;
         }
-
         // Try to parse as correlation rule first
         if let Ok(correlation_rule) = parse_correlation_rule_from_yaml(doc) {
             correlation_rules.push(correlation_rule);

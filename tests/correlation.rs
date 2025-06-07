@@ -173,6 +173,51 @@ level: high
 }
 
 #[test]
+fn parse_correlation_and_base_rules() {
+    let yaml = r#"
+title: Correlation Rule
+correlation:
+  type: temporal
+  rules:
+    - rule1
+    - rule2
+  timespan: 15m
+  condition:
+    eq: 2
+---
+name: rule1
+title: Base Rule 1
+logsource:
+    category: test
+    product: windows
+detection:
+  selection:
+    field1: value1
+  condition: selection
+---
+name: rule2
+title: Base Rule 2
+logsource:
+    category: test
+    product: windows
+detection:
+  selection:
+    field2: value2
+  condition: selection
+"#;
+
+    let (correlation_rules, base_rules) = parse_rules_from_yaml(yaml).unwrap();
+
+    assert_eq!(correlation_rules.len(), 1);
+    assert_eq!(base_rules.len(), 2);
+
+    assert_eq!(correlation_rules[0].title, "Correlation Rule");
+
+    assert_eq!(base_rules[0].0, "rule1");
+    assert_eq!(base_rules[1].0, "rule2");
+}
+
+#[test]
 fn test_event_count_correlation() {
     let mut engine = CorrelationEngine::new();
 
