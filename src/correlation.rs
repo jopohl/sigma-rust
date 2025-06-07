@@ -539,7 +539,7 @@ impl CorrelationEngine {
 
 /// Parse a correlation rule from YAML
 pub fn parse_correlation_rule_from_yaml(yaml: &str) -> Result<SigmaCorrelationRule> {
-    serde_yaml::from_str(yaml).map_err(|e| anyhow!("Failed to parse correlation rule: {}", e))
+    serde_yml::from_str(yaml).map_err(|e| anyhow!("Failed to parse correlation rule: {}", e))
 }
 
 /// Parse multiple rules from YAML (separated by ---)
@@ -561,7 +561,7 @@ pub fn parse_rules_from_yaml(yaml: &str) -> ParseRulesResult {
             // Try to parse as regular Sigma rule
             if let Ok(rule) = rule_from_yaml(doc) {
                 // Extract rule name from YAML metadata
-                if let Ok(yaml_value) = serde_yaml::from_str::<serde_yaml::Value>(doc) {
+                if let Ok(yaml_value) = serde_yml::from_str::<serde_yml::Value>(doc) {
                     if let Some(name) = yaml_value.get("name").and_then(|n| n.as_str()) {
                         base_rules.push((name.to_string(), rule));
                     }
