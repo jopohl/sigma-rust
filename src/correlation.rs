@@ -254,12 +254,12 @@ impl CorrelationEngine {
         values
     }
 
-    /// Process event_count correlation
-    fn process_event_count(
+    /// Helper method to group events into buckets based on timespan and grouping fields
+    fn group_events_into_buckets(
         &self,
         rule: &SigmaCorrelationRule,
         events: &[TimestampedEvent],
-    ) -> Result<Vec<CorrelationResult>> {
+    ) -> Result<HashMap<AggregationKey, Vec<TimestampedEvent>>> {
         let timespan = Self::parse_timespan(&rule.correlation.timespan)?;
         let mut buckets: HashMap<AggregationKey, Vec<TimestampedEvent>> = HashMap::new();
 
@@ -285,6 +285,16 @@ impl CorrelationEngine {
             buckets.entry(key).or_default().push(event.clone());
         }
 
+        Ok(buckets)
+    }
+
+    /// Process event_count correlation
+    fn process_event_count(
+        &self,
+        rule: &SigmaCorrelationRule,
+        events: &[TimestampedEvent],
+    ) -> Result<Vec<CorrelationResult>> {
+        let buckets = self.group_events_into_buckets(rule, events)?;
         // Check conditions for each bucket
         let mut results = Vec::new();
         for (key, bucket_events) in buckets {
@@ -315,31 +325,7 @@ impl CorrelationEngine {
             .field
             .as_ref()
             .ok_or_else(|| anyhow!("value_count correlation requires 'field' parameter"))?;
-
-        let timespan = Self::parse_timespan(&rule.correlation.timespan)?;
-        let mut buckets: HashMap<AggregationKey, Vec<TimestampedEvent>> = HashMap::new();
-
-        // Group events into time buckets
-        for event in events {
-            let time_bucket = Self::create_time_bucket(event.timestamp, timespan);
-            let group_values = if let Some(group_by) = &rule.correlation.group_by {
-                Self::extract_group_values(
-                    &event.event,
-                    group_by,
-                    rule.correlation.aliases.as_ref(),
-                    &event.rule_name,
-                )
-            } else {
-                vec![]
-            };
-
-            let key = AggregationKey {
-                time_bucket,
-                group_values,
-            };
-
-            buckets.entry(key).or_default().push(event.clone());
-        }
+        let buckets = self.group_events_into_buckets(rule, events)?;
 
         // Check conditions for each bucket
         let mut results = Vec::new();
@@ -371,30 +357,7 @@ impl CorrelationEngine {
         rule: &SigmaCorrelationRule,
         events: &[TimestampedEvent],
     ) -> Result<Vec<CorrelationResult>> {
-        let timespan = Self::parse_timespan(&rule.correlation.timespan)?;
-        let mut buckets: HashMap<AggregationKey, Vec<TimestampedEvent>> = HashMap::new();
-
-        // Group events into time buckets
-        for event in events {
-            let time_bucket = Self::create_time_bucket(event.timestamp, timespan);
-            let group_values = if let Some(group_by) = &rule.correlation.group_by {
-                Self::extract_group_values(
-                    &event.event,
-                    group_by,
-                    rule.correlation.aliases.as_ref(),
-                    &event.rule_name,
-                )
-            } else {
-                vec![]
-            };
-
-            let key = AggregationKey {
-                time_bucket,
-                group_values,
-            };
-
-            buckets.entry(key).or_default().push(event.clone());
-        }
+        let buckets = self.group_events_into_buckets(rule, events)?;
 
         // Check conditions for each bucket
         let mut results = Vec::new();
@@ -430,30 +393,7 @@ impl CorrelationEngine {
         rule: &SigmaCorrelationRule,
         events: &[TimestampedEvent],
     ) -> Result<Vec<CorrelationResult>> {
-        let timespan = Self::parse_timespan(&rule.correlation.timespan)?;
-        let mut buckets: HashMap<AggregationKey, Vec<TimestampedEvent>> = HashMap::new();
-
-        // Group events into time buckets
-        for event in events {
-            let time_bucket = Self::create_time_bucket(event.timestamp, timespan);
-            let group_values = if let Some(group_by) = &rule.correlation.group_by {
-                Self::extract_group_values(
-                    &event.event,
-                    group_by,
-                    rule.correlation.aliases.as_ref(),
-                    &event.rule_name,
-                )
-            } else {
-                vec![]
-            };
-
-            let key = AggregationKey {
-                time_bucket,
-                group_values,
-            };
-
-            buckets.entry(key).or_default().push(event.clone());
-        }
+        let buckets = self.group_events_into_buckets(rule, events)?;
 
         // Check conditions for each bucket
         let mut results = Vec::new();
