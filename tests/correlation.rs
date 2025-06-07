@@ -133,7 +133,7 @@ correlation:
   timespan: 15m
   condition:
     gte: 4
-  field: TargetUserName
+    field: TargetUserName
 level: high
 "#;
 
@@ -337,7 +337,7 @@ fn test_event_count_time_window() {
             timestamp: base_time + ChronoDuration::minutes(4),
             rule_name: "test_rule".to_string(),
         },
-        // Event outside 5 minute window - should be in different bucket
+        // Event outside 5-minutes window - should be in different bucket
         TimestampedEvent {
             event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::minutes(10),
@@ -349,7 +349,7 @@ fn test_event_count_time_window() {
     assert_eq!(results.len(), 2); // Two time buckets
 
     let matched_results: Vec<_> = results.iter().filter(|r| r.matched).collect();
-    assert_eq!(matched_results.len(), 1); // Only first bucket should match (3 events)
+    assert_eq!(matched_results.len(), 1); // Only the first bucket should match (3 events)
     assert_eq!(matched_results[0].count, 3);
 }
 
@@ -443,5 +443,205 @@ fn test_value_count_correlation() {
         {
             assert_eq!(result.count, 2); // Bob only has 2 distinct targets
         }
+    }
+}
+
+#[test]
+fn test_temporal_correlation() {
+    let mut engine = CorrelationEngine::new();
+
+    let rule = SigmaCorrelationRule {
+        title: "Temporal Sequence Test".to_string(),
+        correlation: CorrelationSection {
+            correlation_type: CorrelationType::Temporal,
+            rules: vec!["rule_a".to_string(), "rule_b".to_string()],
+            group_by: Some(vec!["user".to_string()]),
+            timespan: "1m".to_string(),
+            condition: CorrelationCondition {
+                gte: Some(2),
+                ..Default::default()
+            },
+            generate: None,
+            aliases: None,
+        },
+        ..Default::default()
+    };
+
+    engine.add_correlation_rule(rule);
+
+    let base_time = DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
+        .unwrap()
+        .with_timezone(&Utc);
+    let events = vec![
+        // Alice's valid sequence (within timespan)
+        TimestampedEvent {
+            event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
+            timestamp: base_time,
+            rule_name: "rule_a".to_string(),
+        },
+        TimestampedEvent {
+            event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
+            timestamp: base_time + ChronoDuration::seconds(30),
+            rule_name: "rule_b".to_string(),
+        },
+        // Bob's valid sequence (within timespan)
+        TimestampedEvent {
+            event: event_from_json(r#"{"user": "bob"}"#).unwrap(),
+            timestamp: base_time + ChronoDuration::seconds(5),
+            rule_name: "rule_a".to_string(),
+        },
+        TimestampedEvent {
+            event: event_from_json(r#"{"user": "bob"}"#).unwrap(),
+            timestamp: base_time + ChronoDuration::seconds(45),
+            rule_name: "rule_b".to_string(),
+        },
+        // Charlie's incomplete sequence (only rule_a)
+        TimestampedEvent {
+            event: event_from_json(r#"{"user": "charlie"}"#).unwrap(),
+            timestamp: base_time,
+            rule_name: "rule_a".to_string(),
+        },
+        // Dave's sequence outside of timespan
+        TimestampedEvent {
+            event: event_from_json(r#"{"user": "dave"}"#).unwrap(),
+            timestamp: base_time,
+            rule_name: "rule_a".to_string(),
+        },
+        TimestampedEvent {
+            event: event_from_json(r#"{"user": "dave"}"#).unwrap(),
+            timestamp: base_time + ChronoDuration::minutes(2),
+            rule_name: "rule_b".to_string(),
+        },
+    ];
+
+    let results = engine.process_events(&events).unwrap();
+
+    // Processed events from 5 users
+    assert_eq!(results.len(), 5);
+
+    // Only two groups should match (alice, bob)
+    let matched_results: Vec<_> = results.iter().filter(|r| r.matched).collect();
+    assert_eq!(matched_results.len(), 2);
+
+    // Verify results for alice and bob
+    for result in &matched_results {
+        // Each match should contain exactly 2 rules
+        assert_eq!(result.count, 2);
+
+        // Confirm that the group value is either alice or bob
+        let group_value = &result.aggregation_key.group_values[0];
+        assert!(group_value == "alice" || group_value == "bob");
+    }
+}
+
+#[test]
+fn test_ordered_temporal_correlation() {
+    let mut engine = CorrelationEngine::new();
+
+    let rule = SigmaCorrelationRule {
+        title: "Ordered Temporal Sequence Test".to_string(),
+        correlation: CorrelationSection {
+            correlation_type: CorrelationType::OrderedTemporal,
+            rules: vec![
+                "rule_a".to_string(),
+                "rule_b".to_string(),
+                "rule_c".to_string(),
+            ],
+            group_by: Some(vec!["user".to_string()]),
+            timespan: "1m".to_string(),
+            condition: CorrelationCondition {
+                gte: Some(3),
+                ..Default::default()
+            },
+            generate: None,
+            aliases: None,
+        },
+        ..Default::default()
+    };
+
+    engine.add_correlation_rule(rule);
+
+    let base_time = DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
+        .unwrap()
+        .with_timezone(&Utc);
+    let events = vec![
+        // Alice's valid sequence (correct order within timespan)
+        TimestampedEvent {
+            event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
+            timestamp: base_time,
+            rule_name: "rule_a".to_string(),
+        },
+        TimestampedEvent {
+            event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
+            timestamp: base_time + ChronoDuration::seconds(15),
+            rule_name: "rule_b".to_string(),
+        },
+        TimestampedEvent {
+            event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
+            timestamp: base_time + ChronoDuration::seconds(30),
+            rule_name: "rule_c".to_string(),
+        },
+        // Bob's invalid sequence (incorrect order - b comes before a)
+        TimestampedEvent {
+            event: event_from_json(r#"{"user": "bob"}"#).unwrap(),
+            timestamp: base_time,
+            rule_name: "rule_b".to_string(),
+        },
+        TimestampedEvent {
+            event: event_from_json(r#"{"user": "bob"}"#).unwrap(),
+            timestamp: base_time + ChronoDuration::seconds(20),
+            rule_name: "rule_a".to_string(),
+        },
+        TimestampedEvent {
+            event: event_from_json(r#"{"user": "bob"}"#).unwrap(),
+            timestamp: base_time + ChronoDuration::seconds(40),
+            rule_name: "rule_c".to_string(),
+        },
+        // Charlie's incomplete sequence (missing rule_b)
+        TimestampedEvent {
+            event: event_from_json(r#"{"user": "charlie"}"#).unwrap(),
+            timestamp: base_time,
+            rule_name: "rule_a".to_string(),
+        },
+        TimestampedEvent {
+            event: event_from_json(r#"{"user": "charlie"}"#).unwrap(),
+            timestamp: base_time + ChronoDuration::seconds(30),
+            rule_name: "rule_c".to_string(),
+        },
+        // Dave's valid sequence but outside of timespan
+        TimestampedEvent {
+            event: event_from_json(r#"{"user": "dave"}"#).unwrap(),
+            timestamp: base_time,
+            rule_name: "rule_a".to_string(),
+        },
+        TimestampedEvent {
+            event: event_from_json(r#"{"user": "dave"}"#).unwrap(),
+            timestamp: base_time + ChronoDuration::seconds(30),
+            rule_name: "rule_b".to_string(),
+        },
+        TimestampedEvent {
+            event: event_from_json(r#"{"user": "dave"}"#).unwrap(),
+            timestamp: base_time + ChronoDuration::minutes(2),
+            rule_name: "rule_c".to_string(),
+        },
+    ];
+
+    let results = engine.process_events(&events).unwrap();
+
+    // Processed events from 5 users
+    assert_eq!(results.len(), 5);
+
+    // Only one group should match (alice)
+    let matched_results: Vec<_> = results.iter().filter(|r| r.matched).collect();
+    assert_eq!(matched_results.len(), 1);
+
+    // Verify results for alice
+    for result in &matched_results {
+        // Each match should contain exactly 3 rules
+        assert_eq!(result.count, 3);
+
+        // Confirm that the group value is alice
+        let group_value = &result.aggregation_key.group_values[0];
+        assert_eq!(group_value, "alice");
     }
 }
