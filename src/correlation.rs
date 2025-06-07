@@ -183,6 +183,17 @@ impl CorrelationEngine {
         DateTime::from_timestamp(bucket_timestamp, 0).unwrap_or(timestamp)
     }
 
+    /// Resolve field aliases for a given field in the context of a rule
+    fn resolve_field_alias(field: &str, aliases: Option<&FieldAliases>, rule_name: &str) -> String {
+        if let Some(aliases) = aliases {
+            if let Some(rule_aliases) = aliases.aliases.get(field) {
+                let f = field.to_string();
+                return rule_aliases.get(rule_name).unwrap_or(&f).to_string();
+            }
+        }
+        field.to_string()
+    }
+
     /// Extract group-by values from an event
     fn extract_group_values(
         event: &Event,
@@ -193,17 +204,8 @@ impl CorrelationEngine {
         group_by
             .iter()
             .map(|field| {
-                let actual_field = if let Some(aliases) = aliases {
-                    if let Some(rule_aliases) = aliases.aliases.get(field) {
-                        rule_aliases.get(rule_name).unwrap_or(field)
-                    } else {
-                        field
-                    }
-                } else {
-                    field
-                };
-
-                event.get(actual_field).unwrap().value_to_string()
+                let actual_field = Self::resolve_field_alias(field, aliases, rule_name);
+                event.get(actual_field.as_str()).unwrap().value_to_string()
             })
             .collect()
     }
@@ -215,18 +217,10 @@ impl CorrelationEngine {
         aliases: Option<&FieldAliases>,
     ) -> std::collections::HashSet<String> {
         let mut values = std::collections::HashSet::new();
-        let f = field.to_string();
         for event in events {
-            let actual_field = if let Some(aliases) = aliases {
-                if let Some(rule_aliases) = aliases.aliases.get(field) {
-                    rule_aliases.get(&event.rule_name).unwrap_or(&f)
-                } else {
-                    field
-                }
-            } else {
-                field
-            };
-            if let Some(value) = event.event.get(actual_field) {
+            let rule_name = &event.rule_name;
+            let actual_field = Self::resolve_field_alias(field, aliases, rule_name);
+            if let Some(value) = event.event.get(&actual_field) {
                 values.insert(value.value_to_string());
             };
         }
