@@ -1,37 +1,12 @@
 use chrono::{DateTime, Utc};
-use sigma_rust::{
-    events_from_json, parse_rules_from_yaml, CorrelationEngine, Event, TimestampedEvent,
-};
+use sigma_rust::{events_from_json, parse_rules_from_yaml, CorrelationEngine, TimestampedEvent};
 use std::error::Error;
 
-/// # Correlation Detection Example
-///
-/// This example demonstrates how to:
-/// 1. Configure a correlation engine with Sigma rules
-/// 2. Process events against these rules
-/// 3. Detect patterns across multiple events
-#[cfg(feature = "serde_json")]
 fn main() -> Result<(), Box<dyn Error>> {
-    // Set up the correlation engine with rules
-    let engine = setup_engine()?;
-
-    // Load sample events
-    let events = load_events()?;
-
-    // Process events and detect matches
-    let matched_events = find_matching_events(&events, &engine);
-
-    // Run correlation analysis on the matched events
-    analyze_correlations(&engine, &matched_events)?;
-
-    Ok(())
-}
-
-/// Sets up the correlation engine with base and correlation rules
-fn setup_engine() -> Result<CorrelationEngine, Box<dyn Error>> {
+    println!("Step 1: Setting up correlation engine...");
     let mut engine = CorrelationEngine::new();
 
-    // Define rules in YAML format
+    println!("Step 2: Parsing and registering rules...");
     let correlation_rule_yaml = r#"
 title: Windows Failed Logon Event
 name: failed_logon
@@ -58,10 +33,7 @@ correlation:
 tags:
   - brute_force
 "#;
-
-    // Parse and register rules with the engine
     let (correlation_rules, base_rules) = parse_rules_from_yaml(correlation_rule_yaml)?;
-
     for (name, rule) in base_rules {
         engine.add_base_rule(name, rule);
     }
@@ -70,12 +42,7 @@ tags:
         engine.add_correlation_rule(rule);
     }
 
-    Ok(engine)
-}
-
-/// Loads sample events for demonstration
-fn load_events() -> Result<Vec<Event>, Box<dyn Error>> {
-    // Sample events with failed login attempts for the same user
+    println!("Step 3: Loading sample events...");
     let events_str = r#"
 [
     {
@@ -94,54 +61,39 @@ fn load_events() -> Result<Vec<Event>, Box<dyn Error>> {
         "TargetUserName": "admin"
     }
 ]"#;
+    let events = events_from_json(events_str)?;
 
-    Ok(events_from_json(events_str)?)
-}
+    println!("Step 4: Finding events that match base rules...");
+    let mut matched_events = Vec::new();
+    for event in &events {
+        for rule in engine.base_rules.values() {
+            if rule.is_match(event) {
+                if let Some(timestamp_field) = event.get("Timestamp") {
+                    let timestamp_str = timestamp_field.value_to_string();
+                    if let Ok(parsed_time) = DateTime::parse_from_rfc3339(&timestamp_str) {
+                        let utc_time = parsed_time.with_timezone(&Utc);
+                        let timestamped_event = TimestampedEvent {
+                            event: event.clone(),
+                            timestamp: utc_time,
+                            rule_name: rule.name.clone().unwrap_or("unnamed".to_string()),
+                        };
+                        matched_events.push(timestamped_event);
+                    }
+                }
+            }
+        }
+    }
 
-/// Identifies events matching any of the base rules using functional style
-fn find_matching_events(events: &[Event], engine: &CorrelationEngine) -> Vec<TimestampedEvent> {
-    events
-        .iter()
-        .flat_map(|event| {
-            engine
-                .base_rules
-                .values()
-                .filter(|rule| rule.is_match(event))
-                .filter_map(|rule| {
-                    // Extract timestamp from event
-                    let timestamp = event.get("Timestamp").and_then(|ts| {
-                        let ts_str = ts.value_to_string();
-                        DateTime::parse_from_rfc3339(&ts_str)
-                            .ok()
-                            .map(|dt| dt.with_timezone(&Utc))
-                    })?;
-
-                    // Create timestamped event with rule context
-                    Some(TimestampedEvent {
-                        event: event.clone(),
-                        timestamp,
-                        rule_name: rule.name.clone()?,
-                    })
-                })
-        })
-        .collect()
-}
-
-/// Processes matched events through the correlation engine and displays results
-fn analyze_correlations(
-    engine: &CorrelationEngine,
-    events: &[TimestampedEvent],
-) -> Result<(), Box<dyn Error>> {
-    // Run correlation detection on matched events
-    let results = engine.process_events(events)?;
-    for result in &results {
+    println!("Step 5: Running correlation analysis...");
+    let results = engine.process_events(&matched_events)?;
+    println!("================================");
+    for result in results.iter() {
+        println!("Title: {}", result.rule.title);
+        println!("Event Count: {} events", result.count);
         println!(
-            "Rule: {}\nMatched Events: {}\nCorrelation Detected: {}",
-            result.rule.title,
-            result.count,
+            "Correlation Detected: {}",
             if result.matched { "YES" } else { "NO" }
         );
     }
-
     Ok(())
 }
