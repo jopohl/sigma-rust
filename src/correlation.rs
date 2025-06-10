@@ -106,9 +106,9 @@ pub struct AggregationKey {
 }
 
 /// Result of correlation processing
-#[derive(Debug, Clone)]
-pub struct CorrelationResult {
-    pub rule: SigmaCorrelationRule,
+pub struct CorrelationResult<'a> {
+    pub rule_id: &'a str,
+    pub rule_title: &'a str,
     pub matched: bool,
     pub events: Vec<TimestampedEvent>,
     pub aggregation_key: AggregationKey,
@@ -263,11 +263,11 @@ impl CorrelationEngine {
     }
 
     /// Process event_count correlation
-    fn process_event_count(
+    fn process_event_count<'a>(
         &self,
-        rule: &SigmaCorrelationRule,
+        rule: &'a SigmaCorrelationRule,
         events: &[TimestampedEvent],
-    ) -> Result<Vec<CorrelationResult>> {
+    ) -> Result<Vec<CorrelationResult<'a>>> {
         let buckets = self.group_events_into_buckets(rule, events)?;
         // Check conditions for each bucket
         let mut results = Vec::new();
@@ -276,7 +276,8 @@ impl CorrelationEngine {
             let matched = rule.correlation.condition.matches(count);
 
             results.push(CorrelationResult {
-                rule: rule.clone(),
+                rule_id: rule.id.as_deref().unwrap_or("-"),
+                rule_title: &rule.title,
                 matched,
                 events: bucket_events,
                 aggregation_key: key,
@@ -288,11 +289,11 @@ impl CorrelationEngine {
     }
 
     /// Process value_count correlation
-    fn process_value_count(
+    fn process_value_count<'a>(
         &self,
-        rule: &SigmaCorrelationRule,
+        rule: &'a SigmaCorrelationRule,
         events: &[TimestampedEvent],
-    ) -> Result<Vec<CorrelationResult>> {
+    ) -> Result<Vec<CorrelationResult<'a>>> {
         let field = rule
             .correlation
             .condition
@@ -314,7 +315,8 @@ impl CorrelationEngine {
             let matched = rule.correlation.condition.matches(count);
 
             results.push(CorrelationResult {
-                rule: rule.clone(),
+                rule_id: rule.id.as_deref().unwrap_or("-"),
+                rule_title: &rule.title,
                 matched,
                 events: bucket_events,
                 aggregation_key: key,
@@ -326,11 +328,11 @@ impl CorrelationEngine {
     }
 
     /// Process temporal correlation
-    fn process_temporal(
+    fn process_temporal<'a>(
         &self,
-        rule: &SigmaCorrelationRule,
+        rule: &'a SigmaCorrelationRule,
         events: &[TimestampedEvent],
-    ) -> Result<Vec<CorrelationResult>> {
+    ) -> Result<Vec<CorrelationResult<'a>>> {
         let buckets = self.group_events_into_buckets(rule, events)?;
 
         // Check conditions for each bucket
@@ -350,7 +352,8 @@ impl CorrelationEngine {
                 && rule.correlation.condition.matches(distinct_rule_count);
 
             results.push(CorrelationResult {
-                rule: rule.clone(),
+                rule_id: rule.id.as_deref().unwrap_or("-"),
+                rule_title: &rule.title,
                 matched,
                 events: bucket_events,
                 aggregation_key: key,
@@ -362,11 +365,11 @@ impl CorrelationEngine {
     }
 
     /// Process ordered temporal correlation
-    fn process_ordered_temporal(
+    fn process_ordered_temporal<'a>(
         &self,
-        rule: &SigmaCorrelationRule,
+        rule: &'a SigmaCorrelationRule,
         events: &[TimestampedEvent],
-    ) -> Result<Vec<CorrelationResult>> {
+    ) -> Result<Vec<CorrelationResult<'a>>> {
         let buckets = self.group_events_into_buckets(rule, events)?;
 
         // Check conditions for each bucket
@@ -408,7 +411,8 @@ impl CorrelationEngine {
                 && rule.correlation.condition.matches(distinct_rule_count);
 
             results.push(CorrelationResult {
-                rule: rule.clone(),
+                rule_id: rule.id.as_deref().unwrap_or("-"),
+                rule_title: &rule.title,
                 matched,
                 events: bucket_events,
                 aggregation_key: key,
