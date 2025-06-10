@@ -200,12 +200,15 @@ impl CorrelationEngine {
         group_by: &[String],
         aliases: Option<&FieldAliases>,
         rule_name: &str,
-    ) -> Vec<String> {
+    ) -> Result<Vec<String>> {
         group_by
             .iter()
             .map(|field| {
                 let actual_field = Self::resolve_field_alias(field, aliases, rule_name);
-                event.get(actual_field.as_str()).unwrap().value_to_string()
+                event
+                    .get(actual_field.as_str())
+                    .ok_or_else(|| anyhow!("Field '{}' not found in event", actual_field))
+                    .map(|v| v.value_to_string())
             })
             .collect()
     }
@@ -248,12 +251,12 @@ impl CorrelationEngine {
                     &event.rule_name,
                 )
             } else {
-                vec![]
+                Ok(vec![])
             };
 
             let key = AggregationKey {
                 time_bucket,
-                group_values,
+                group_values: group_values?,
             };
 
             buckets.entry(key).or_default().push(event.clone());
