@@ -31,5 +31,9 @@ criterion = { version = "0.5", features = ["html_reports"] }
 name = "matching_benchmark"
 harness = false
 
+[[bench]]
+name = "correlation_benchmark"
+harness = false
+
 [features]
 default = ["serde_json"]
