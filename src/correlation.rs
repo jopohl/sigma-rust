@@ -110,7 +110,7 @@ pub struct CorrelationResult<'a> {
     pub rule_id: &'a str,
     pub rule_title: &'a str,
     pub matched: bool,
-    pub events: Vec<TimestampedEvent>,
+    pub events: Vec<&'a TimestampedEvent>,
     pub aggregation_key: AggregationKey,
     pub count: u64,
 }
@@ -176,6 +176,7 @@ impl CorrelationEngine {
     }
 
     /// Create time buckets based on timespan
+    #[inline]
     fn create_time_bucket(timestamp: DateTime<Utc>, timespan: Duration) -> DateTime<Utc> {
         let bucket_size_secs = timespan.as_secs() as i64;
         let timestamp_secs = timestamp.timestamp();
@@ -215,7 +216,7 @@ impl CorrelationEngine {
 
     /// Extract distinct values for value_count correlation
     fn extract_field_values(
-        events: &[TimestampedEvent],
+        events: &[&TimestampedEvent],
         field: &str,
         aliases: Option<&FieldAliases>,
     ) -> std::collections::HashSet<String> {
@@ -232,13 +233,13 @@ impl CorrelationEngine {
     }
 
     /// Helper method to group events into buckets based on timespan and grouping fields
-    fn group_events_into_buckets(
+    fn group_events_into_buckets<'a>(
         &self,
         rule: &SigmaCorrelationRule,
-        events: &[TimestampedEvent],
-    ) -> Result<HashMap<AggregationKey, Vec<TimestampedEvent>>> {
+        events: &[&'a TimestampedEvent],
+    ) -> Result<HashMap<AggregationKey, Vec<&'a TimestampedEvent>>> {
         let timespan = Self::parse_timespan(&rule.correlation.timespan)?;
-        let mut buckets: HashMap<AggregationKey, Vec<TimestampedEvent>> = HashMap::new();
+        let mut buckets: HashMap<AggregationKey, Vec<&TimestampedEvent>> = HashMap::new();
 
         // Group events into time buckets
         for event in events {
@@ -259,7 +260,7 @@ impl CorrelationEngine {
                 group_values: group_values?,
             };
 
-            buckets.entry(key).or_default().push(event.clone());
+            buckets.entry(key).or_default().push(*event);
         }
 
         Ok(buckets)
@@ -269,7 +270,7 @@ impl CorrelationEngine {
     fn process_event_count<'a>(
         &self,
         rule: &'a SigmaCorrelationRule,
-        events: &[TimestampedEvent],
+        events: &[&'a TimestampedEvent],
     ) -> Result<Vec<CorrelationResult<'a>>> {
         let buckets = self.group_events_into_buckets(rule, events)?;
         // Check conditions for each bucket
@@ -295,7 +296,7 @@ impl CorrelationEngine {
     fn process_value_count<'a>(
         &self,
         rule: &'a SigmaCorrelationRule,
-        events: &[TimestampedEvent],
+        events: &Vec<&'a TimestampedEvent>,
     ) -> Result<Vec<CorrelationResult<'a>>> {
         let field = rule
             .correlation
@@ -334,7 +335,7 @@ impl CorrelationEngine {
     fn process_temporal<'a>(
         &self,
         rule: &'a SigmaCorrelationRule,
-        events: &[TimestampedEvent],
+        events: &Vec<&'a TimestampedEvent>,
     ) -> Result<Vec<CorrelationResult<'a>>> {
         let buckets = self.group_events_into_buckets(rule, events)?;
 
@@ -371,7 +372,7 @@ impl CorrelationEngine {
     fn process_ordered_temporal<'a>(
         &self,
         rule: &'a SigmaCorrelationRule,
-        events: &[TimestampedEvent],
+        events: &Vec<&'a TimestampedEvent>,
     ) -> Result<Vec<CorrelationResult<'a>>> {
         let buckets = self.group_events_into_buckets(rule, events)?;
 
@@ -427,15 +428,17 @@ impl CorrelationEngine {
     }
 
     /// Process events against correlation rules
-    pub fn process_events(&self, events: &[TimestampedEvent]) -> Result<Vec<CorrelationResult>> {
+    pub fn process_events<'a>(
+        &'a self,
+        events: &'a [TimestampedEvent],
+    ) -> Result<Vec<CorrelationResult<'a>>> {
         let mut all_results = Vec::new();
 
         for rule in &self.rules {
             // Filter events that match the referenced rules
-            let matching_events: Vec<TimestampedEvent> = events
+            let matching_events: Vec<&TimestampedEvent> = events
                 .iter()
                 .filter(|event| rule.correlation.rules.contains(&event.rule_name))
-                .cloned()
                 .collect();
 
             if matching_events.is_empty() {
