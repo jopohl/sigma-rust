@@ -1,6 +1,8 @@
 use crate::{rule_from_yaml, Event, Rule};
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
+use rayon::iter::IntoParallelRefIterator;
+use rayon::iter::ParallelIterator;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -432,32 +434,43 @@ impl CorrelationEngine {
         &'a self,
         events: &'a [TimestampedEvent],
     ) -> Result<Vec<CorrelationResult<'a>>> {
-        let mut all_results = Vec::new();
+        // Parallelize the processing of each rule
+        let all_results: Result<Vec<Vec<CorrelationResult<'a>>>> = self
+            .rules
+            .par_iter()
+            .map(|rule| {
+                // Filter events that match the referenced rules
+                let matching_events: Vec<&TimestampedEvent> = events
+                    .iter()
+                    .filter(|event| rule.correlation.rules.contains(&event.rule_name))
+                    .collect();
 
-        for rule in &self.rules {
-            // Filter events that match the referenced rules
-            let matching_events: Vec<&TimestampedEvent> = events
-                .iter()
-                .filter(|event| rule.correlation.rules.contains(&event.rule_name))
-                .collect();
-
-            if matching_events.is_empty() {
-                continue;
-            }
-
-            let results = match rule.correlation.correlation_type {
-                CorrelationType::EventCount => self.process_event_count(rule, &matching_events)?,
-                CorrelationType::ValueCount => self.process_value_count(rule, &matching_events)?,
-                CorrelationType::Temporal => self.process_temporal(rule, &matching_events)?,
-                CorrelationType::OrderedTemporal => {
-                    self.process_ordered_temporal(rule, &matching_events)?
+                if matching_events.is_empty() {
+                    return Ok(Vec::new());
                 }
-            };
 
-            all_results.extend(results);
-        }
+                let results = match rule.correlation.correlation_type {
+                    CorrelationType::EventCount => {
+                        self.process_event_count(rule, &matching_events)?
+                    }
+                    CorrelationType::ValueCount => {
+                        self.process_value_count(rule, &matching_events)?
+                    }
+                    CorrelationType::Temporal => self.process_temporal(rule, &matching_events)?,
+                    CorrelationType::OrderedTemporal => {
+                        self.process_ordered_temporal(rule, &matching_events)?
+                    }
+                };
 
-        Ok(all_results)
+                Ok(results)
+            })
+            .collect();
+
+        // Flatten the results
+        let flattened_results: Vec<CorrelationResult<'a>> =
+            all_results?.into_iter().flatten().collect();
+
+        Ok(flattened_results)
     }
 }
 
