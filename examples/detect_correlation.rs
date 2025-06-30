@@ -8,17 +8,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Step 2: Parsing and registering rules...");
     let correlation_rule_yaml = r#"
-title: Windows Failed Logon Event
-name: failed_logon
-description: Detects failed logon events on Windows systems.
-logsource:
-  product: windows
-  service: security
-detection:
-  selection:
-    EventID: 4625
-  condition: selection
----
 title: Multiple failed logons for a single user
 status: test
 correlation:
@@ -32,6 +21,17 @@ correlation:
     gte: 3
 tags:
   - brute_force
+---
+title: Windows Failed Logon Event
+name: failed_logon
+description: Detects failed logon events on Windows systems.
+logsource:
+  product: windows
+  service: security
+detection:
+  selection:
+    EventID: 4625
+  condition: selection
 "#;
     let (correlation_rules, base_rules) = parse_rules_from_yaml(correlation_rule_yaml)?;
     for (name, rule) in base_rules {
