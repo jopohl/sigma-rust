@@ -111,6 +111,7 @@ pub struct AggregationKey {
 pub struct CorrelationResult<'a> {
     pub rule_id: &'a str,
     pub rule_title: &'a str,
+    pub generate: bool,
     pub matched: bool,
     pub events: Vec<&'a TimestampedEvent>,
     pub aggregation_key: AggregationKey,
@@ -284,6 +285,7 @@ impl CorrelationEngine {
             results.push(CorrelationResult {
                 rule_id: rule.id.as_deref().unwrap_or("-"),
                 rule_title: &rule.title,
+                generate: rule.correlation.generate.unwrap_or(false),
                 matched,
                 events: bucket_events,
                 aggregation_key: key,
@@ -323,6 +325,7 @@ impl CorrelationEngine {
             results.push(CorrelationResult {
                 rule_id: rule.id.as_deref().unwrap_or("-"),
                 rule_title: &rule.title,
+                generate: rule.correlation.generate.unwrap_or(false),
                 matched,
                 events: bucket_events,
                 aggregation_key: key,
@@ -360,6 +363,7 @@ impl CorrelationEngine {
             results.push(CorrelationResult {
                 rule_id: rule.id.as_deref().unwrap_or("-"),
                 rule_title: &rule.title,
+                generate: rule.correlation.generate.unwrap_or(false),
                 matched,
                 events: bucket_events,
                 aggregation_key: key,
@@ -419,6 +423,7 @@ impl CorrelationEngine {
             results.push(CorrelationResult {
                 rule_id: rule.id.as_deref().unwrap_or("-"),
                 rule_title: &rule.title,
+                generate: rule.correlation.generate.unwrap_or(false),
                 matched,
                 events: bucket_events,
                 aggregation_key: key,
