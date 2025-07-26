@@ -503,7 +503,12 @@ pub fn parse_rules_from_yaml(yaml: &str) -> ParseRulesResult {
             if let Ok(rule) = rule_from_yaml(doc) {
                 // Extract rule name from YAML metadata
                 if let Ok(yaml_value) = serde_yml::from_str::<serde_yml::Value>(doc) {
-                    if let Some(name) = yaml_value.get("name").and_then(|n| n.as_str()) {
+                    let rule_name = yaml_value
+                        .get("name")
+                        .or_else(|| yaml_value.get("id"))
+                        .or_else(|| yaml_value.get("title"))
+                        .and_then(|v| v.as_str());
+                    if let Some(name) = rule_name {
                         base_rules.push((name.to_string(), rule));
                     }
                 }
