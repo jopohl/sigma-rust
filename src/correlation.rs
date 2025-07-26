@@ -94,10 +94,10 @@ pub struct SigmaCorrelationRule {
 
 /// Event with timestamp for correlation processing
 #[derive(Debug, Clone)]
-pub struct TimestampedEvent {
+pub struct TimestampedEvent<'a> {
     pub event: Event,
     pub timestamp: DateTime<Utc>,
-    pub rule_name: String,
+    pub rule: &'a Rule,
 }
 
 /// Aggregation bucket for grouping events
@@ -111,7 +111,7 @@ pub struct AggregationKey {
 pub struct CorrelationResult<'a> {
     pub rule: &'a SigmaCorrelationRule,
     pub matched: bool,
-    pub events: Vec<&'a TimestampedEvent>,
+    pub events: Vec<&'a TimestampedEvent<'a>>,
     pub aggregation_key: AggregationKey,
     pub count: u64,
 }
@@ -223,7 +223,7 @@ impl CorrelationEngine {
     ) -> std::collections::HashSet<String> {
         let mut values = std::collections::HashSet::new();
         for event in events {
-            let rule_name = &event.rule_name;
+            let rule_name = &event.rule.title;
             let actual_field = Self::resolve_field_alias(field, aliases, rule_name);
             if let Some(value) = event.event.get(&actual_field) {
                 values.insert(value.value_to_string());
@@ -238,7 +238,7 @@ impl CorrelationEngine {
         &self,
         rule: &SigmaCorrelationRule,
         events: &[&'a TimestampedEvent],
-    ) -> Result<HashMap<AggregationKey, Vec<&'a TimestampedEvent>>> {
+    ) -> Result<HashMap<AggregationKey, Vec<&'a TimestampedEvent<'a>>>> {
         let timespan = Self::parse_timespan(&rule.correlation.timespan)?;
         let mut buckets: HashMap<AggregationKey, Vec<&TimestampedEvent>> = HashMap::new();
 
@@ -250,7 +250,7 @@ impl CorrelationEngine {
                     &event.event,
                     group_by,
                     rule.correlation.aliases.as_ref(),
-                    &event.rule_name,
+                    &event.rule.title,
                 )
             } else {
                 Ok(vec![])
@@ -269,7 +269,7 @@ impl CorrelationEngine {
 
     /// Process event_count correlation
     fn process_event_count<'a>(
-        &self,
+        &'a self,
         rule: &'a SigmaCorrelationRule,
         events: &[&'a TimestampedEvent],
     ) -> Result<Vec<CorrelationResult<'a>>> {
@@ -294,7 +294,7 @@ impl CorrelationEngine {
 
     /// Process value_count correlation
     fn process_value_count<'a>(
-        &self,
+        &'a self,
         rule: &'a SigmaCorrelationRule,
         events: &Vec<&'a TimestampedEvent>,
     ) -> Result<Vec<CorrelationResult<'a>>> {
@@ -332,7 +332,7 @@ impl CorrelationEngine {
 
     /// Process temporal correlation
     fn process_temporal<'a>(
-        &self,
+        &'a self,
         rule: &'a SigmaCorrelationRule,
         events: &Vec<&'a TimestampedEvent>,
     ) -> Result<Vec<CorrelationResult<'a>>> {
@@ -344,7 +344,7 @@ impl CorrelationEngine {
             // Count distinct rule types in the bucket
             let mut rule_types = std::collections::HashSet::new();
             for event in &bucket_events {
-                rule_types.insert(&event.rule_name);
+                rule_types.insert(&event.rule.title);
             }
 
             let distinct_rule_count = rule_types.len() as u64;
@@ -389,7 +389,7 @@ impl CorrelationEngine {
                     .correlation
                     .rules
                     .iter()
-                    .position(|r| r == &event.rule_name)
+                    .position(|r| r == &event.rule.title)
                 {
                     if rule_index < last_rule_index {
                         rule_order_matched = false;
@@ -402,7 +402,7 @@ impl CorrelationEngine {
             // Count distinct rule types
             let mut rule_types = std::collections::HashSet::new();
             for event in &bucket_events {
-                rule_types.insert(&event.rule_name);
+                rule_types.insert(&event.rule.title);
             }
 
             let distinct_rule_count = rule_types.len() as u64;
@@ -437,7 +437,7 @@ impl CorrelationEngine {
                 // Filter events that match the referenced rules
                 let matching_events: Vec<&TimestampedEvent> = events
                     .iter()
-                    .filter(|event| rule.correlation.rules.contains(&event.rule_name))
+                    .filter(|event| rule.correlation.rules.contains(&event.rule.title))
                     .collect();
 
                 if matching_events.is_empty() {

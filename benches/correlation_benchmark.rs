@@ -1,20 +1,27 @@
 use chrono::{DateTime, Utc};
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use sigma_rust::correlation::*;
-use sigma_rust::event_from_json;
+use sigma_rust::{event_from_json, rule_from_yaml, Rule};
 use std::collections::HashMap;
 
+fn create_test_rule(title: &str) -> Rule {
+    let yaml = format!(
+        "title: {}\nlogsource:\n  category: test\n  product: test\ndetection:\n  selection:\n    field: value\n  condition: selection",
+        title
+    );
+    rule_from_yaml(&yaml).unwrap()
+}
 /// Generate test events for benchmarking
-fn generate_test_events(
+fn generate_test_events<'a>(
     count: usize,
     users: &[&str],
     time_spread_minutes: i64,
-) -> Vec<TimestampedEvent> {
+    rule: &'a Rule,
+) -> Vec<TimestampedEvent<'a>> {
     let mut events = Vec::new();
     let base_time = DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
         .unwrap()
         .with_timezone(&Utc);
-
     for i in 0..count {
         let mut event_data = HashMap::new();
         event_data.insert(
@@ -40,14 +47,12 @@ fn generate_test_events(
         // Spread events over time
         let minutes_offset = (i as i64 * time_spread_minutes) / count as i64;
         let timestamp = base_time + chrono::Duration::minutes(minutes_offset);
-
         events.push(TimestampedEvent {
             event,
             timestamp,
-            rule_name: "failed_logon".to_string(),
+            rule,
         });
     }
-
     events
 }
 
@@ -142,10 +147,10 @@ fn bench_process_events_scale(c: &mut Criterion) {
 
     let users = vec!["admin", "user1", "user2", "user3", "user4", "guest"];
     let engine = create_test_engine();
-
+    let rule: Rule = create_test_rule("failed_logon");
     // Test with different event counts
     for size in [100, 500, 1000, 2000, 5000].iter() {
-        let events = generate_test_events(*size, &users, 60); // 1 hour
+        let events = generate_test_events(*size, &users, 60, &rule); // 1 hour
 
         group.throughput(Throughput::Elements(*size as u64));
         group.bench_with_input(BenchmarkId::new("events", size), &events, |b, events| {
@@ -174,9 +179,9 @@ fn bench_process_events_time_windows(c: &mut Criterion) {
         ("2hours", 120),
         ("1day", 1440),
     ];
-
+    let rule: Rule = create_test_rule("failed_logon");
     for (name, minutes) in time_spreads {
-        let events = generate_test_events(event_count, &users, minutes);
+        let events = generate_test_events(event_count, &users, minutes, &rule);
 
         group.bench_with_input(BenchmarkId::new("timespan", name), &events, |b, events| {
             b.iter(|| {
@@ -201,8 +206,8 @@ fn bench_process_events_user_groups(c: &mut Criterion) {
     for user_count in user_counts {
         let users: Vec<String> = (0..user_count).map(|i| format!("user{}", i)).collect();
         let user_refs: Vec<&str> = users.iter().map(|s| s.as_str()).collect();
-
-        let events = generate_test_events(event_count, &user_refs, 30);
+        let rule: Rule = create_test_rule("failed_logon");
+        let events = generate_test_events(event_count, &user_refs, 30, &rule);
 
         group.bench_with_input(
             BenchmarkId::new("users", user_count),
@@ -223,7 +228,8 @@ fn bench_correlation_types(c: &mut Criterion) {
     let mut group = c.benchmark_group("correlation_types");
 
     let users = vec!["admin", "user1", "user2", "user3"];
-    let events = generate_test_events(1000, &users, 30);
+    let rule: Rule = create_test_rule("failed_logon");
+    let events = generate_test_events(1000, &users, 30, &rule);
 
     // Test individual correlation types
     let correlation_types = vec![
@@ -295,7 +301,8 @@ fn bench_multiple_rules(c: &mut Criterion) {
     let mut group = c.benchmark_group("multiple_rules");
 
     let users = vec!["admin", "user1", "user2"];
-    let events = generate_test_events(1000, &users, 30);
+    let rule: Rule = create_test_rule("failed_logon");
+    let events = generate_test_events(1000, &users, 30, &rule);
 
     // Test with different numbers of correlation rules
     for rule_count in [1, 3, 5, 10, 20].iter() {

@@ -1,7 +1,14 @@
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use sigma_rust::correlation::*;
-use sigma_rust::event_from_json;
+use sigma_rust::{event_from_json, rule_from_yaml, Rule};
 
+fn create_test_rule(title: &str) -> Rule {
+    let yaml = format!(
+        "title: {}\nlogsource:\n  category: test\n  product: test\ndetection:\n  selection:\n    field: value\n  condition: selection",
+        title
+    );
+    rule_from_yaml(&yaml).unwrap()
+}
 #[test]
 fn test_parse_timespan() {
     assert_eq!(
@@ -243,21 +250,22 @@ fn test_event_count_correlation() {
     let base_time = DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
         .unwrap()
         .with_timezone(&Utc);
+    let rule: Rule = create_test_rule("test_rule");
     let events = vec![
         TimestampedEvent {
             event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
             timestamp: base_time,
-            rule_name: "test_rule".to_string(),
+            rule: &rule,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::seconds(30),
-            rule_name: "test_rule".to_string(),
+            rule: &rule,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::seconds(60),
-            rule_name: "test_rule".to_string(),
+            rule: &rule,
         },
     ];
 
@@ -293,34 +301,35 @@ fn test_event_count_correlation_multiple_groups() {
     let base_time = DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
         .unwrap()
         .with_timezone(&Utc);
+    let rule: Rule = create_test_rule("test_rule");
     let events = vec![
         // Alice events (should match)
         TimestampedEvent {
             event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
             timestamp: base_time,
-            rule_name: "test_rule".to_string(),
+            rule: &rule,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::seconds(30),
-            rule_name: "test_rule".to_string(),
+            rule: &rule,
         },
         // Bob events (should match)
         TimestampedEvent {
             event: event_from_json(r#"{"user": "bob"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::seconds(60),
-            rule_name: "test_rule".to_string(),
+            rule: &rule,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "bob"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::seconds(90),
-            rule_name: "test_rule".to_string(),
+            rule: &rule,
         },
         // Charlie events (should not match - only 1 event)
         TimestampedEvent {
             event: event_from_json(r#"{"user": "charlie"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::seconds(120),
-            rule_name: "test_rule".to_string(),
+            rule: &rule,
         },
     ];
 
@@ -361,7 +370,7 @@ fn test_event_count_time_window() {
     };
 
     engine.add_correlation_rule(rule);
-
+    let rule: Rule = create_test_rule("test_rule");
     let base_time = DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
         .unwrap()
         .with_timezone(&Utc);
@@ -370,23 +379,23 @@ fn test_event_count_time_window() {
         TimestampedEvent {
             event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
             timestamp: base_time,
-            rule_name: "test_rule".to_string(),
+            rule: &rule,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::minutes(2),
-            rule_name: "test_rule".to_string(),
+            rule: &rule,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::minutes(4),
-            rule_name: "test_rule".to_string(),
+            rule: &rule,
         },
         // Event outside 5-minutes window - should be in different bucket
         TimestampedEvent {
             event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::minutes(10),
-            rule_name: "test_rule".to_string(),
+            rule: &rule,
         },
     ];
 
@@ -428,38 +437,39 @@ fn test_value_count_correlation() {
     let base_time = DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
         .unwrap()
         .with_timezone(&Utc);
+    let rule: Rule = create_test_rule("test_rule");
     let events = vec![
         // Alice targeting different systems
         TimestampedEvent {
             event: event_from_json(r#"{"user": "alice", "target": "system1"}"#).unwrap(),
             timestamp: base_time,
-            rule_name: "test_rule".to_string(),
+            rule: &rule,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "alice", "target": "system2"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::minutes(5),
-            rule_name: "test_rule".to_string(),
+            rule: &rule,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "alice", "target": "system3"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::minutes(10),
-            rule_name: "test_rule".to_string(),
+            rule: &rule,
         },
         // Bob targeting only two systems
         TimestampedEvent {
             event: event_from_json(r#"{"user": "bob", "target": "system1"}"#).unwrap(),
             timestamp: base_time,
-            rule_name: "test_rule".to_string(),
+            rule: &rule,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "bob", "target": "system2"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::minutes(5),
-            rule_name: "test_rule".to_string(),
+            rule: &rule,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "bob", "target": "system2"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::minutes(10),
-            rule_name: "test_rule".to_string(),
+            rule: &rule,
         },
     ];
 
@@ -517,45 +527,47 @@ fn test_temporal_correlation() {
     let base_time = DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
         .unwrap()
         .with_timezone(&Utc);
+    let rule_a: Rule = create_test_rule("rule_a");
+    let rule_b: Rule = create_test_rule("rule_b");
     let events = vec![
         // Alice's valid sequence (within timespan)
         TimestampedEvent {
             event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
             timestamp: base_time,
-            rule_name: "rule_a".to_string(),
+            rule: &rule_a,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::seconds(30),
-            rule_name: "rule_b".to_string(),
+            rule: &rule_b,
         },
         // Bob's valid sequence (within timespan)
         TimestampedEvent {
             event: event_from_json(r#"{"user": "bob"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::seconds(5),
-            rule_name: "rule_a".to_string(),
+            rule: &rule_a,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "bob"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::seconds(45),
-            rule_name: "rule_b".to_string(),
+            rule: &rule_b,
         },
         // Charlie's incomplete sequence (only rule_a)
         TimestampedEvent {
             event: event_from_json(r#"{"user": "charlie"}"#).unwrap(),
             timestamp: base_time,
-            rule_name: "rule_a".to_string(),
+            rule: &rule_a,
         },
         // Dave's sequence outside of timespan
         TimestampedEvent {
             event: event_from_json(r#"{"user": "dave"}"#).unwrap(),
             timestamp: base_time,
-            rule_name: "rule_a".to_string(),
+            rule: &rule_a,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "dave"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::minutes(2),
-            rule_name: "rule_b".to_string(),
+            rule: &rule_b,
         },
     ];
 
@@ -609,65 +621,70 @@ fn test_ordered_temporal_correlation() {
     let base_time = DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
         .unwrap()
         .with_timezone(&Utc);
+
+    let rule_a: Rule = create_test_rule("rule_a");
+    let rule_b: Rule = create_test_rule("rule_b");
+    let rule_c: Rule = create_test_rule("rule_c");
+
     let events = vec![
         // Alice's valid sequence (correct order within timespan)
         TimestampedEvent {
             event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
             timestamp: base_time,
-            rule_name: "rule_a".to_string(),
+            rule: &rule_a,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::seconds(15),
-            rule_name: "rule_b".to_string(),
+            rule: &rule_b,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "alice"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::seconds(30),
-            rule_name: "rule_c".to_string(),
+            rule: &rule_c,
         },
         // Bob's invalid sequence (incorrect order - b comes before a)
         TimestampedEvent {
             event: event_from_json(r#"{"user": "bob"}"#).unwrap(),
             timestamp: base_time,
-            rule_name: "rule_b".to_string(),
+            rule: &rule_b,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "bob"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::seconds(20),
-            rule_name: "rule_a".to_string(),
+            rule: &rule_a,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "bob"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::seconds(40),
-            rule_name: "rule_c".to_string(),
+            rule: &rule_c,
         },
         // Charlie's incomplete sequence (missing rule_b)
         TimestampedEvent {
             event: event_from_json(r#"{"user": "charlie"}"#).unwrap(),
             timestamp: base_time,
-            rule_name: "rule_a".to_string(),
+            rule: &rule_a,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "charlie"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::seconds(30),
-            rule_name: "rule_c".to_string(),
+            rule: &rule_c,
         },
         // Dave's valid sequence but outside of timespan
         TimestampedEvent {
             event: event_from_json(r#"{"user": "dave"}"#).unwrap(),
             timestamp: base_time,
-            rule_name: "rule_a".to_string(),
+            rule: &rule_a,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "dave"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::seconds(30),
-            rule_name: "rule_b".to_string(),
+            rule: &rule_b,
         },
         TimestampedEvent {
             event: event_from_json(r#"{"user": "dave"}"#).unwrap(),
             timestamp: base_time + ChronoDuration::minutes(2),
-            rule_name: "rule_c".to_string(),
+            rule: &rule_c,
         },
     ];
 

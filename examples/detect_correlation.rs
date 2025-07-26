@@ -13,7 +13,7 @@ status: test
 correlation:
   type: event_count
   rules:
-    - failed_logon
+    - Windows Failed Logon Event
   group-by:
     - TargetUserName
   timespan: 1m
@@ -75,7 +75,7 @@ detection:
                         let timestamped_event = TimestampedEvent {
                             event: event.clone(),
                             timestamp: utc_time,
-                            rule_name: rule.name.clone().unwrap_or("unnamed".to_string()),
+                            rule,
                         };
                         matched_events.push(timestamped_event);
                     }
