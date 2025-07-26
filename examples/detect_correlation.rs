@@ -88,7 +88,7 @@ detection:
     let results = engine.process_events(&matched_events)?;
     println!("================================");
     for result in results.iter() {
-        println!("Title: {}", result.rule_title);
+        println!("Title: {}", result.rule.title);
         println!("Event Count: {} events", result.count);
         println!(
             "Correlation Detected: {}",

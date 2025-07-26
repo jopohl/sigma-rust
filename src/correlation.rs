@@ -109,9 +109,7 @@ pub struct AggregationKey {
 
 /// Result of correlation processing
 pub struct CorrelationResult<'a> {
-    pub rule_id: &'a str,
-    pub rule_title: &'a str,
-    pub generate: bool,
+    pub rule: &'a SigmaCorrelationRule,
     pub matched: bool,
     pub events: Vec<&'a TimestampedEvent>,
     pub aggregation_key: AggregationKey,
@@ -283,9 +281,7 @@ impl CorrelationEngine {
             let matched = rule.correlation.condition.matches(count);
 
             results.push(CorrelationResult {
-                rule_id: rule.id.as_deref().unwrap_or("-"),
-                rule_title: &rule.title,
-                generate: rule.correlation.generate.unwrap_or(false),
+                rule,
                 matched,
                 events: bucket_events,
                 aggregation_key: key,
@@ -323,9 +319,7 @@ impl CorrelationEngine {
             let matched = rule.correlation.condition.matches(count);
 
             results.push(CorrelationResult {
-                rule_id: rule.id.as_deref().unwrap_or("-"),
-                rule_title: &rule.title,
-                generate: rule.correlation.generate.unwrap_or(false),
+                rule,
                 matched,
                 events: bucket_events,
                 aggregation_key: key,
@@ -361,9 +355,7 @@ impl CorrelationEngine {
                 && rule.correlation.condition.matches(distinct_rule_count);
 
             results.push(CorrelationResult {
-                rule_id: rule.id.as_deref().unwrap_or("-"),
-                rule_title: &rule.title,
-                generate: rule.correlation.generate.unwrap_or(false),
+                rule,
                 matched,
                 events: bucket_events,
                 aggregation_key: key,
@@ -421,9 +413,7 @@ impl CorrelationEngine {
                 && rule.correlation.condition.matches(distinct_rule_count);
 
             results.push(CorrelationResult {
-                rule_id: rule.id.as_deref().unwrap_or("-"),
-                rule_title: &rule.title,
-                generate: rule.correlation.generate.unwrap_or(false),
+                rule,
                 matched,
                 events: bucket_events,
                 aggregation_key: key,
