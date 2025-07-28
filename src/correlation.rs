@@ -15,7 +15,7 @@ pub enum CorrelationType {
     EventCount,
     ValueCount,
     Temporal,
-    OrderedTemporal,
+    TemporalOrdered,
 }
 
 /// Condition for correlation matching
@@ -452,7 +452,7 @@ impl CorrelationEngine {
                         self.process_value_count(rule, &matching_events)?
                     }
                     CorrelationType::Temporal => self.process_temporal(rule, &matching_events)?,
-                    CorrelationType::OrderedTemporal => {
+                    CorrelationType::TemporalOrdered => {
                         self.process_ordered_temporal(rule, &matching_events)?
                     }
                 };

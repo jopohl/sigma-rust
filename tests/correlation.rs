@@ -598,7 +598,7 @@ fn test_ordered_temporal_correlation() {
     let rule = SigmaCorrelationRule {
         title: "Ordered Temporal Sequence Test".to_string(),
         correlation: CorrelationSection {
-            correlation_type: CorrelationType::OrderedTemporal,
+            correlation_type: CorrelationType::TemporalOrdered,
             rules: vec![
                 "rule_a".to_string(),
                 "rule_b".to_string(),

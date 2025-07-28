@@ -236,7 +236,7 @@ fn bench_correlation_types(c: &mut Criterion) {
         ("event_count", CorrelationType::EventCount),
         ("value_count", CorrelationType::ValueCount),
         ("temporal", CorrelationType::Temporal),
-        ("ordered_temporal", CorrelationType::OrderedTemporal),
+        ("temporal_ordered", CorrelationType::TemporalOrdered),
     ];
 
     for (name, corr_type) in correlation_types {
