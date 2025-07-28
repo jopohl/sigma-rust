@@ -354,11 +354,7 @@ impl CorrelationEngine {
             let expected_rule_count = rule.correlation.rules.len() as u64;
 
             // For temporal correlation, we need at least as many distinct rules as specified
-            let default_matched = distinct_rule_count >= expected_rule_count;
-            let matched = rule.correlation.condition
-                .as_ref()
-                .map_or(default_matched, |condition| condition.matches(distinct_rule_count));
-
+            let matched = distinct_rule_count >= expected_rule_count;
             results.push(CorrelationResult {
                 rule,
                 matched,
@@ -413,13 +409,7 @@ impl CorrelationEngine {
             let distinct_rule_count = rule_types.len() as u64;
             let expected_rule_count = rule.correlation.rules.len() as u64;
 
-            let default_matched = rule_order_matched && distinct_rule_count >= expected_rule_count;
-            let matched = rule.correlation.condition
-                .as_ref()
-                .map_or(default_matched, |condition| {
-                    rule_order_matched && condition.matches(distinct_rule_count)
-                });
-
+            let matched = rule_order_matched && distinct_rule_count >= expected_rule_count;
             results.push(CorrelationResult {
                 rule,
                 matched,
