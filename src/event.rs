@@ -13,7 +13,7 @@ struct EventProxy {
     value: serde_json::Value,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum EventValue {
     Value(BaseValue),
     Sequence(Vec<EventValue>),
@@ -179,9 +179,9 @@ where
 /// The `Event` struct represents a log event.
 ///
 /// It is a collection of key-value pairs
-/// where the key is a string and the value is a string, number, or boolean
+/// where the key is a string, and the value is a string, number, or boolean
 /// The value may also be `None` to represent a null value.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde_json", derive(serde::Deserialize))]
 #[cfg_attr(feature = "serde_json", serde(try_from = "EventProxy"))]
 pub struct Event {

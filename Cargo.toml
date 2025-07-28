@@ -20,6 +20,9 @@ serde_yml = "0.0.12"
 strum = { version = "0.26.3", features = ["derive"] }
 thiserror = "1.0.64"
 serde_json = { version = "1.0.132", optional = true }
+chrono = "0.4.41"
+anyhow = "1.0.98"
+rayon = "1.9.0"
 
 [dev-dependencies]
 walkdir = "2.5.0"
@@ -27,6 +30,10 @@ criterion = { version = "0.5", features = ["html_reports"] }
 
 [[bench]]
 name = "matching_benchmark"
+harness = false
+
+[[bench]]
+name = "correlation_benchmark"
 harness = false
 
 [features]
