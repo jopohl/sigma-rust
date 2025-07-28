@@ -60,7 +60,8 @@ pub struct CorrelationSection {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub group_by: Option<Vec<String>>,
     pub timespan: String,
-    pub condition: CorrelationCondition,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub condition: Option<CorrelationCondition>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub generate: Option<bool>, // Whether to retain base rule in output
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -278,7 +279,9 @@ impl CorrelationEngine {
         let mut results = Vec::new();
         for (key, bucket_events) in buckets {
             let count = bucket_events.len() as u64;
-            let matched = rule.correlation.condition.matches(count);
+            let matched = rule.correlation.condition
+                .as_ref()
+                .map_or(true, |condition| condition.matches(count));
 
             results.push(CorrelationResult {
                 rule,
@@ -298,12 +301,11 @@ impl CorrelationEngine {
         rule: &'a SigmaCorrelationRule,
         events: &Vec<&'a TimestampedEvent>,
     ) -> Result<Vec<CorrelationResult<'a>>> {
-        let field = rule
-            .correlation
-            .condition
-            .field
-            .as_ref()
-            .ok_or_else(|| anyhow!("value_count correlation requires 'field' parameter"))?;
+        let condition = rule.correlation.condition.as_ref();
+        let field = condition
+            .and_then(|c| c.field.as_ref())
+            .ok_or_else(|| anyhow!("value_count correlation requires 'field' parameter in condition"))?;
+
         let buckets = self.group_events_into_buckets(rule, events)?;
 
         // Check conditions for each bucket
@@ -316,7 +318,8 @@ impl CorrelationEngine {
             );
 
             let count = distinct_values.len() as u64;
-            let matched = rule.correlation.condition.matches(count);
+            let matched = condition
+                .map_or(true, |condition| condition.matches(count));
 
             results.push(CorrelationResult {
                 rule,
@@ -351,7 +354,10 @@ impl CorrelationEngine {
             let expected_rule_count = rule.correlation.rules.len() as u64;
 
             // For temporal correlation, we need at least as many distinct rules as specified
-            let matched = distinct_rule_count >= expected_rule_count;
+            let default_matched = distinct_rule_count >= expected_rule_count;
+            let matched = rule.correlation.condition
+                .as_ref()
+                .map_or(default_matched, |condition| condition.matches(distinct_rule_count));
 
             results.push(CorrelationResult {
                 rule,
@@ -407,8 +413,12 @@ impl CorrelationEngine {
             let distinct_rule_count = rule_types.len() as u64;
             let expected_rule_count = rule.correlation.rules.len() as u64;
 
-            let matched = rule_order_matched
-                && distinct_rule_count >= expected_rule_count;
+            let default_matched = rule_order_matched && distinct_rule_count >= expected_rule_count;
+            let matched = rule.correlation.condition
+                .as_ref()
+                .map_or(default_matched, |condition| {
+                    rule_order_matched && condition.matches(distinct_rule_count)
+                });
 
             results.push(CorrelationResult {
                 rule,

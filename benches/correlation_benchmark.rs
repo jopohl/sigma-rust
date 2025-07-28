@@ -89,10 +89,10 @@ detection:
             rules: vec!["failed_logon".to_string()],
             group_by: Some(vec!["TargetUserName".to_string()]),
             timespan: "5m".to_string(),
-            condition: CorrelationCondition {
+            condition: Some(CorrelationCondition {
                 gte: Some(5),
                 ..Default::default()
-            },
+            }),
             ..Default::default()
         },
         ..Default::default()
@@ -107,11 +107,11 @@ detection:
             rules: vec!["failed_logon".to_string()],
             group_by: Some(vec!["TargetUserName".to_string()]),
             timespan: "10m".to_string(),
-            condition: CorrelationCondition {
+            condition: Some(CorrelationCondition {
                 gte: Some(3),
                 field: Some("SourceIP".to_string()),
                 ..Default::default()
-            },
+            }),
             ..Default::default()
         },
         ..Default::default()
@@ -126,10 +126,10 @@ detection:
             rules: vec!["failed_logon".to_string()],
             group_by: Some(vec!["TargetUserName".to_string()]),
             timespan: "15m".to_string(),
-            condition: CorrelationCondition {
+            condition: Some(CorrelationCondition {
                 gte: Some(1),
                 ..Default::default()
-            },
+            }),
             ..Default::default()
         },
         ..Default::default()
@@ -270,7 +270,7 @@ detection:
                 rules: vec!["failed_logon".to_string()],
                 group_by: Some(vec!["TargetUserName".to_string()]),
                 timespan: "5m".to_string(),
-                condition: CorrelationCondition {
+                condition: Some(CorrelationCondition {
                     gte: Some(2),
                     field: if matches!(corr_type, CorrelationType::ValueCount) {
                         Some("SourceIP".to_string())
@@ -278,7 +278,7 @@ detection:
                         None
                     },
                     ..Default::default()
-                },
+                }),
                 ..Default::default()
             },
             ..Default::default()
@@ -337,10 +337,10 @@ detection:
                     rules: vec!["failed_logon".to_string()],
                     group_by: Some(vec!["TargetUserName".to_string()]),
                     timespan: format!("{}m", (i % 10) + 1),
-                    condition: CorrelationCondition {
+                    condition: Some(CorrelationCondition {
                         gte: Some((i % 5) + 1),
                         ..Default::default()
-                    },
+                    }),
                     ..Default::default()
                 },
                 ..Default::default()

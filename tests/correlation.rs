@@ -123,7 +123,7 @@ tags:
     );
     assert_eq!(rule.correlation.rules, vec!["failed_logon"]);
     assert_eq!(rule.correlation.timespan, "5m");
-    assert_eq!(rule.correlation.condition.gte, Some(10));
+    assert_eq!(rule.correlation.condition.unwrap().gte, Some(10));
 }
 
 #[test]
@@ -150,10 +150,10 @@ level: high
         CorrelationType::ValueCount
     );
     assert_eq!(
-        rule.correlation.condition.field,
+        rule.correlation.condition.clone().unwrap().field,
         Some("TargetUserName".to_string())
     );
-    assert_eq!(rule.correlation.condition.gte, Some(4));
+    assert_eq!(rule.correlation.condition.unwrap().gte, Some(4));
 }
 
 #[test]
@@ -235,10 +235,10 @@ fn test_event_count_correlation() {
             rules: vec!["test_rule".to_string()],
             group_by: Some(vec!["user".to_string()]),
             timespan: "5m".to_string(),
-            condition: CorrelationCondition {
+            condition: Some(CorrelationCondition {
                 gte: Some(3),
                 ..Default::default()
-            },
+            }),
             generate: None,
             aliases: None,
         },
@@ -286,10 +286,10 @@ fn test_event_count_correlation_multiple_groups() {
             rules: vec!["test_rule".to_string()],
             group_by: Some(vec!["user".to_string()]),
             timespan: "5m".to_string(),
-            condition: CorrelationCondition {
+            condition: Some(CorrelationCondition {
                 gte: Some(2),
                 ..Default::default()
-            },
+            }),
             generate: None,
             aliases: None,
         },
@@ -355,14 +355,14 @@ fn test_event_count_time_window() {
             rules: vec!["test_rule".to_string()],
             group_by: Some(vec!["user".to_string()]),
             timespan: "5m".to_string(),
-            condition: CorrelationCondition {
+            condition: Some(CorrelationCondition {
                 gte: Some(3),
                 lte: None,
                 eq: None,
                 gt: None,
                 lt: None,
                 field: None,
-            },
+            }),
             generate: None,
             aliases: None,
         },
@@ -418,14 +418,14 @@ fn test_value_count_correlation() {
             rules: vec!["test_rule".to_string()],
             group_by: Some(vec!["user".to_string()]),
             timespan: "15m".to_string(),
-            condition: CorrelationCondition {
+            condition: Some(CorrelationCondition {
                 gte: Some(3),
                 lte: None,
                 eq: None,
                 gt: None,
                 lt: None,
                 field: Some("target".to_string()),
-            },
+            }),
             generate: None,
             aliases: None,
         },
@@ -512,10 +512,10 @@ fn test_temporal_correlation() {
             rules: vec!["rule_a".to_string(), "rule_b".to_string()],
             group_by: Some(vec!["user".to_string()]),
             timespan: "1m".to_string(),
-            condition: CorrelationCondition {
+            condition: Some(CorrelationCondition {
                 gte: Some(2),
                 ..Default::default()
-            },
+            }),
             generate: None,
             aliases: None,
         },
@@ -606,10 +606,10 @@ fn test_ordered_temporal_correlation() {
             ],
             group_by: Some(vec!["user".to_string()]),
             timespan: "1m".to_string(),
-            condition: CorrelationCondition {
+            condition: Some(CorrelationCondition {
                 gte: Some(3),
                 ..Default::default()
-            },
+            }),
             generate: None,
             aliases: None,
         },
