@@ -16,10 +16,10 @@ base64 = "0.22.1"
 cidr = "0.3.0"
 regex = "1.11.0"
 serde = { version = "1.0.210", features = ["derive"] }
-serde_yml = "0.0.12"
 strum = { version = "0.26.3", features = ["derive"] }
 thiserror = "1.0.64"
 serde_json = { version = "1.0.132", optional = true }
+serde_norway = "0.9.42"
 
 [dev-dependencies]
 walkdir = "2.5.0"

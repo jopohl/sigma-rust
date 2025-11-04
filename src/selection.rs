@@ -6,8 +6,8 @@ use crate::error::SelectionError::{
 use crate::event::Event;
 use crate::field::Field;
 use serde::Deserialize;
-use serde_yml::Value;
-use serde_yml::Value::{Mapping, Sequence};
+use serde_norway::Value;
+use serde_norway::Value::{Mapping, Sequence};
 
 /// A field group is a collection of fields that are to be combined with AND
 /// In other words a fields group translates to a YAML dictionary
@@ -22,9 +22,9 @@ impl FieldGroup {
     }
 }
 
-impl TryFrom<serde_yml::Mapping> for FieldGroup {
+impl TryFrom<serde_norway::Mapping> for FieldGroup {
     type Error = ParserError;
-    fn try_from(mapping: serde_yml::Mapping) -> Result<Self, Self::Error> {
+    fn try_from(mapping: serde_norway::Mapping) -> Result<Self, Self::Error> {
         let mut fields = vec![];
         for (name, values) in mapping.into_iter() {
             match name {
@@ -132,7 +132,7 @@ mod tests {
     use crate::basevalue::BaseValue;
     use crate::event::Event;
     use crate::field::{FieldValue, MatchModifier};
-    use serde_yml::Value;
+    use serde_norway::Value;
 
     #[test]
     fn test_keyword_selection() {
@@ -198,7 +198,7 @@ mod tests {
             - hello
     "#;
 
-        let value: Value = serde_yml::from_str(yaml).unwrap();
+        let value: Value = serde_norway::from_str(yaml).unwrap();
         let selection = Selection::try_from(value).unwrap();
         assert!(
             matches!(selection, Selection::Keyword(kw) if kw.len() == 3 && kw[0] == "0" && kw[1] == "6" && kw[2] == "hello")
@@ -213,7 +213,7 @@ mod tests {
             - hello: world
     "#;
 
-        let value: Value = serde_yml::from_str(yaml).unwrap();
+        let value: Value = serde_norway::from_str(yaml).unwrap();
         let err = Selection::try_from(value).unwrap_err();
         assert!(matches!(
             err,
@@ -233,7 +233,7 @@ mod tests {
             - cd
             - ed
 "#;
-        let data: serde_yml::Mapping = serde_yml::from_str(yaml).unwrap();
+        let data: serde_norway::Mapping = serde_norway::from_str(yaml).unwrap();
         assert_eq!(data.len(), 1);
 
         let value = data.values().next().unwrap().clone();

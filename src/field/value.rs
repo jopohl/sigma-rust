@@ -21,10 +21,10 @@ where
     }
 }
 
-impl TryFrom<serde_yml::Value> for FieldValue {
+impl TryFrom<serde_norway::Value> for FieldValue {
     type Error = ParserError;
 
-    fn try_from(value: serde_yml::Value) -> Result<Self, Self::Error> {
+    fn try_from(value: serde_norway::Value) -> Result<Self, Self::Error> {
         Ok(Self::Base(BaseValue::try_from(value)?))
     }
 }

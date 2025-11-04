@@ -12,7 +12,7 @@ detection:
         - 'evil'
     condition: keywords
 "#;
-    let rule: Rule = serde_yml::from_str(yaml).unwrap();
+    let rule: Rule = serde_norway::from_str(yaml).unwrap();
     let event_1 = Event::from([("a", "this is hello world "), ("os", "is windows")]);
     let event_2 = Event::from([("b", "this is arch linux!"), ("more", "something")]);
     let event_3 = Event::from([("c", "evil"), ("more", "something")]);
@@ -38,7 +38,7 @@ detection:
         b: chuck
     condition: keywords and selection
 "#;
-    let rule: Rule = serde_yml::from_str(yaml).unwrap();
+    let rule: Rule = serde_norway::from_str(yaml).unwrap();
     let event_1 = Event::from([("a", "this is hello world "), ("os", "is windows")]);
     let event_2 = Event::from([("a", "test"), ("b", "chuck"), ("c", "hello world")]);
     let event_3 = Event::from([("a", "test"), ("b", "chuck")]);
@@ -71,7 +71,7 @@ fn test_match_field_list() {
             condition: selection and 1 of filter_*
     "#;
 
-    let rule: Rule = serde_yml::from_str(yaml).unwrap();
+    let rule: Rule = serde_norway::from_str(yaml).unwrap();
 
     let event_1 = Event::from([
         ("Image", "C:\\rundll32.exe"),
