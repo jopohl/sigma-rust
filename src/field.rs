@@ -14,7 +14,7 @@ use crate::field::ValueTransformer::{Base64, Base64offset, Windash};
 use crate::wildcard::{tokenize, WildcardToken};
 use cidr::IpCidr;
 use regex::Regex;
-use serde_yml::Value;
+use serde_norway::Value;
 use std::str::FromStr;
 
 // https://sigmahq.io/docs/basics/modifiers.html

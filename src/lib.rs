@@ -14,8 +14,8 @@ pub use event::Event;
 pub use rule::Rule;
 
 /// Parse a rule from a YAML string
-pub fn rule_from_yaml(yaml: &str) -> Result<Rule, serde_yml::Error> {
-    serde_yml::from_str(yaml)
+pub fn rule_from_yaml(yaml: &str) -> Result<Rule, serde_norway::Error> {
+    serde_norway::from_str(yaml)
 }
 
 /// Parse an event from a JSON string

@@ -34,7 +34,7 @@ falsepositives:
 level: medium
         "#;
 
-    let rule: Rule = serde_yml::from_str(rule_yaml).unwrap();
+    let rule: Rule = serde_norway::from_str(rule_yaml).unwrap();
     let event_1 = Event::from([
         ("TargetFilename", "C:\\temp\\file.au3"),
         ("Image", "C:\\temp\\autoit4.exe"),

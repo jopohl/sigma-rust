@@ -145,7 +145,7 @@ pub struct Rule {
     pub tags: Option<Vec<String>>,
     /// Capture any additional fields
     #[serde(flatten)]
-    pub custom_fields: HashMap<String, serde_yml::Value>,
+    pub custom_fields: HashMap<String, serde_norway::Value>,
 }
 
 impl Rule {
@@ -213,7 +213,7 @@ mod tests {
         another_custom_field:
             nested: nested_value
         "#;
-        let rule: Rule = serde_yml::from_str(rule_yaml).unwrap();
+        let rule: Rule = serde_norway::from_str(rule_yaml).unwrap();
         assert_eq!(rule.title, "Some test title");
         assert_eq!(
             rule.id,
