@@ -176,6 +176,21 @@ where
     }
 }
 
+/// `QueryableEvent` is used to run the sigma rules on top of any
+/// struct that can be queryable, instead of creating an `Event`
+/// which allocates a HashMap, this trait allows users to wrap their
+/// own data structures and avoid an allocation. Another possibility is
+/// to query files or databases if needed.
+pub trait QueryableEvent {
+    /// Iterate over the key-value pairs in the event
+    fn iter(&self) -> impl Iterator<Item = (&String, &EventValue)>;
+
+    /// Get the value for a key in the event
+    fn get(&self, key: &str) -> Option<&EventValue>;
+
+    fn values(&self) -> impl Iterator<Item = &EventValue>;
+}
+
 /// The `Event` struct represents a log event.
 ///
 /// It is a collection of key-value pairs
@@ -212,11 +227,9 @@ where
 }
 
 impl Event {
-    /// Create a new empty event
     pub fn new() -> Self {
         Self::default()
     }
-
     /// Insert a key-value pair into the event.
     /// If the key already exists, the value will be replaced.
     ///
@@ -236,14 +249,16 @@ impl Event {
     {
         self.inner.insert(key.into(), value.into());
     }
+}
 
+impl QueryableEvent for Event {
     /// Iterate over the key-value pairs in the event
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &EventValue)> {
+    fn iter(&self) -> impl Iterator<Item = (&String, &EventValue)> {
         self.inner.iter()
     }
 
     /// Get the value for a key in the event
-    pub fn get(&self, key: &str) -> Option<&EventValue> {
+    fn get(&self, key: &str) -> Option<&EventValue> {
         if let Some(ev) = self.inner.get(key) {
             return Some(ev);
         }
@@ -264,7 +279,7 @@ impl Event {
         None
     }
 
-    pub fn values(&self) -> impl Iterator<Item = &EventValue> {
+    fn values(&self) -> impl Iterator<Item = &EventValue> {
         self.inner.values()
     }
 }
