@@ -3,7 +3,7 @@ mod lexer;
 
 use crate::detection::ast::Ast;
 use crate::error::ParserError;
-use crate::event::{Event, QueryableEvent};
+use crate::event::QueryableEvent;
 use crate::selection::Selection;
 use crate::wildcard::match_tokenized;
 use serde::Deserialize;
@@ -155,6 +155,7 @@ impl Detection {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Event;
 
     #[test]
     fn test_missing_identifier() {

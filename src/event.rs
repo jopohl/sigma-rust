@@ -230,6 +230,7 @@ impl Event {
     pub fn new() -> Self {
         Self::default()
     }
+
     /// Insert a key-value pair into the event.
     /// If the key already exists, the value will be replaced.
     ///

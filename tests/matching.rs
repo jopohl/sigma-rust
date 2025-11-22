@@ -1,4 +1,4 @@
-use sigma_rust::{rule_from_yaml, Event, QueryableEvent, Rule};
+use sigma_rust::{rule_from_yaml, Event, Rule};
 
 #[test]
 fn test_match_rule_with_keywords() {

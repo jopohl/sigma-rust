@@ -8,7 +8,7 @@ pub use value::*;
 use crate::basevalue::BaseValue;
 use crate::error::ParserError;
 use crate::error::ParserError::{IPParsing, InvalidYAML};
-use crate::event::{Event, EventValue, QueryableEvent};
+use crate::event::{EventValue, QueryableEvent};
 use crate::field::transformation::{encode_base64, encode_base64_offset, windash_variations};
 use crate::field::ValueTransformer::{Base64, Base64offset, Windash};
 use crate::wildcard::{tokenize, WildcardToken};
@@ -212,6 +212,7 @@ impl Field {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Event;
 
     #[test]
     fn test_parse_name_only() {

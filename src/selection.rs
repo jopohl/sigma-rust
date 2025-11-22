@@ -3,7 +3,7 @@ use crate::error::SelectionError::{
     InvalidKeywordSelection, InvalidSelectionType, MixedKeywordAndFieldlist,
     SelectionContainsNoFields,
 };
-use crate::event::{Event, QueryableEvent};
+use crate::event::QueryableEvent;
 use crate::field::Field;
 use serde::Deserialize;
 use serde_norway::Value;
