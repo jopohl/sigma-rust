@@ -136,7 +136,7 @@ fn test_match_null_fields() {
 
     let rule = rule_from_yaml(yaml).unwrap();
     let event_1 = Event::from([("OriginalFileName", "RUNDLL32.EXE")]);
-    let mut event_2 = Event::new();
+    let mut event_2 = Event::default();
     event_2.insert("Image", "c:\\rundll32.exe");
     event_2.insert("CommandLine", None);
 

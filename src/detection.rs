@@ -3,7 +3,7 @@ mod lexer;
 
 use crate::detection::ast::Ast;
 use crate::error::ParserError;
-use crate::event::Event;
+use crate::event::QueryableEvent;
 use crate::selection::Selection;
 use crate::wildcard::match_tokenized;
 use serde::Deserialize;
@@ -92,15 +92,15 @@ impl Detection {
         Ok(())
     }
 
-    pub(crate) fn evaluate(&self, event: &Event) -> bool {
+    pub(crate) fn evaluate<E: QueryableEvent>(&self, event: &E) -> bool {
         self.eval(event, &self.ast, &mut HashMap::new())
     }
 
-    fn evaluate_selection(
+    fn evaluate_selection<E: QueryableEvent>(
         &self,
         name: &str,
         lookup: &mut HashMap<String, bool>,
-        event: &Event,
+        event: &E,
     ) -> bool {
         if let Some(e) = lookup.get(name) {
             *e
@@ -115,7 +115,12 @@ impl Detection {
         }
     }
 
-    fn eval(&self, event: &Event, ast: &Ast, lookup: &mut HashMap<String, bool>) -> bool {
+    fn eval<E: QueryableEvent>(
+        &self,
+        event: &E,
+        ast: &Ast,
+        lookup: &mut HashMap<String, bool>,
+    ) -> bool {
         match ast {
             Ast::Selection(s) => self.evaluate_selection(s, lookup, event),
             Ast::OneOf(s) => self
@@ -150,6 +155,7 @@ impl Detection {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Event;
 
     #[test]
     fn test_missing_identifier() {

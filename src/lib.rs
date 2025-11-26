@@ -11,6 +11,7 @@ mod selection;
 mod wildcard;
 
 pub use event::Event;
+pub use event::QueryableEvent;
 pub use rule::Rule;
 
 /// Parse a rule from a YAML string

@@ -3,7 +3,7 @@ use crate::error::SelectionError::{
     InvalidKeywordSelection, InvalidSelectionType, MixedKeywordAndFieldlist,
     SelectionContainsNoFields,
 };
-use crate::event::Event;
+use crate::event::QueryableEvent;
 use crate::field::Field;
 use serde::Deserialize;
 use serde_norway::Value;
@@ -17,7 +17,7 @@ pub struct FieldGroup {
 }
 
 impl FieldGroup {
-    fn evaluate(&self, event: &Event) -> bool {
+    fn evaluate<E: QueryableEvent>(&self, event: &E) -> bool {
         self.fields.iter().all(|field| field.evaluate(event))
     }
 }
@@ -116,7 +116,7 @@ impl TryFrom<Value> for Selection {
 }
 
 impl Selection {
-    pub(crate) fn evaluate(&self, event: &Event) -> bool {
+    pub(crate) fn evaluate<E: QueryableEvent>(&self, event: &E) -> bool {
         match &self {
             Self::Keyword(keywords) => event
                 .values()
